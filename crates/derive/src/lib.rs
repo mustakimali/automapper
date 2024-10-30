@@ -58,21 +58,28 @@ impl Parse for Request {
 
 impl ToTokens for TraitImpl {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let cargo_toml_path = caller_crate_cargo_toml();
+        dbg!(&cargo_toml_path);
+
         // let json_path = rustdoc_json::Builder::default()
         //     .toolchain("nightly")
-        //     .manifest_path("Cargo.toml")
+        //     .manifest_path(&cargo_toml_path)
         //     .document_private_items(true)
-        //     .all_features(true)
+        //     .all_features(false)
         //     .build()
-        //     .unwrap();
+        //     .expect("failed to build rustdoc JSON!");
+
+        // std::fs::copy(
+        //     json_path,
+        //     cargo_toml_path.parent().unwrap().join("rustdoc.json"),
+        // )
+        // .expect("failed to copy rustdoc JSON!");
 
         // dbg!("Wrote rustdoc JSON to {:?}", &json_path);
 
-        let path = caller_crate_cargo_toml().to_string_lossy().to_string();
-
         tokens.extend(quote! {
             {
-                const CREATE_ROOT: &str = #path;
+
             }
         });
     }
