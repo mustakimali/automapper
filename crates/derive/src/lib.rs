@@ -68,7 +68,7 @@ impl ToTokens for TraitImpl {
 
         // dbg!("Wrote rustdoc JSON to {:?}", &json_path);
 
-        let path = caller_crate_root().to_string_lossy().to_string();
+        let path = caller_crate_cargo_toml().to_string_lossy().to_string();
 
         tokens.extend(quote! {
             {
@@ -80,7 +80,7 @@ impl ToTokens for TraitImpl {
 
 /// Returns the root path of the crate that calls this function.
 /// This is a cursed method
-fn caller_crate_root() -> PathBuf {
+fn caller_crate_cargo_toml() -> PathBuf {
     let crate_name =
         std::env::var("CARGO_PKG_NAME").expect("failed to read ENV var `CARGO_PKG_NAME`!");
     let current_dir = std::env::current_dir().expect("failed to unwrap env::current_dir()!");
@@ -108,7 +108,7 @@ fn caller_crate_root() -> PathBuf {
             .collect::<String>()
             .contains(search_entry.as_str())
         {
-            return entry.path().parent().unwrap().to_path_buf();
+            return entry.path().to_path_buf();
         }
     }
     current_dir
