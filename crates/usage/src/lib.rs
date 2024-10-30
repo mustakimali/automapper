@@ -33,6 +33,7 @@ fn rustdoc_json() {
         .toolchain("nightly")
         .manifest_path("Cargo.toml")
         .document_private_items(true)
+        .all_features(true)
         .build()
         .unwrap();
 

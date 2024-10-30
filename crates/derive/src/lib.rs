@@ -1,25 +1,28 @@
-use proc_macro::TokenStream;
+use std::path::PathBuf;
+
+use proc_macro::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
     DeriveInput, Meta, Token,
 };
+use walkdir::WalkDir;
 
-mod rustdoc_json;
+mod rustdoc_json_parser;
 
 struct TraitImpl {
     struct_token: Token![fn],
     iden: syn::Ident,
     paren_token: token::Paren,
-    fields: Punctuated<Request, Token![,]>,
+    mapping: Request,
     semi_token: Token![;],
 }
 
 #[derive(Clone)]
 struct Request {
-    name: syn::Ident,
-    _colon: syn::Token![,],
-    input: syn::Ident,
+    source_type: syn::Ident,
+    _coma: syn::Token![,],
+    dest_type: syn::Ident,
 }
 
 #[proc_macro]
@@ -30,18 +33,14 @@ pub fn lazy_map(input: TokenStream) -> TokenStream {
 
 impl Parse for TraitImpl {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        dbg!(&input);
         let content;
         let this = Self {
             struct_token: input.parse()?,
             iden: input.parse()?,
             paren_token: parenthesized!(content in input),
-            fields: content.parse_terminated(Request::parse, Token![,])?,
+            mapping: content.parse()?,
             semi_token: input.parse()?,
         };
-        if this.fields.len() != 1 {
-            panic!("Expected two types only");
-        }
 
         Ok(this)
     }
@@ -50,15 +49,67 @@ impl Parse for TraitImpl {
 impl Parse for Request {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            name: input.parse()?,
-            _colon: input.parse()?,
-            input: input.parse()?,
+            source_type: input.parse()?,
+            _coma: input.parse()?,
+            dest_type: input.parse()?,
         })
     }
 }
 
 impl ToTokens for TraitImpl {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.extend(quote! {})
+        // let json_path = rustdoc_json::Builder::default()
+        //     .toolchain("nightly")
+        //     .manifest_path("Cargo.toml")
+        //     .document_private_items(true)
+        //     .all_features(true)
+        //     .build()
+        //     .unwrap();
+
+        // dbg!("Wrote rustdoc JSON to {:?}", &json_path);
+
+        let path = caller_crate_root().to_string_lossy().to_string();
+
+        tokens.extend(quote! {
+            {
+                const CREATE_ROOT: &str = #path;
+            }
+        });
     }
+}
+
+/// Returns the root path of the crate that calls this function.
+/// This is a cursed method
+fn caller_crate_root() -> PathBuf {
+    let crate_name =
+        std::env::var("CARGO_PKG_NAME").expect("failed to read ENV var `CARGO_PKG_NAME`!");
+    let current_dir = std::env::current_dir().expect("failed to unwrap env::current_dir()!");
+    let search_entry = format!("name=\"{crate_name}\"");
+    for entry in WalkDir::new(&current_dir)
+        .into_iter()
+        .filter_entry(|e| !e.file_name().eq_ignore_ascii_case("target"))
+    {
+        let Ok(entry) = entry else { continue };
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let Some(file_name) = entry.path().file_name() else {
+            continue;
+        };
+        if !file_name.eq_ignore_ascii_case("Cargo.toml") {
+            continue;
+        }
+        let Ok(cargo_toml) = std::fs::read_to_string(&entry.path()) else {
+            continue;
+        };
+        if cargo_toml
+            .chars()
+            .filter(|&c| !c.is_whitespace())
+            .collect::<String>()
+            .contains(search_entry.as_str())
+        {
+            return entry.path().parent().unwrap().to_path_buf();
+        }
+    }
+    current_dir
 }
