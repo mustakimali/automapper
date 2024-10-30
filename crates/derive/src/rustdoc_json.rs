@@ -1,5 +1,8 @@
 use anyhow::Context;
+use models::*;
 use serde_json::Value;
+
+mod models;
 
 pub fn find_fields_of_struct(name: &str, rustdoc: &Value) -> anyhow::Result<Vec<String>> {
     let index = rustdoc
@@ -36,30 +39,19 @@ pub fn find_all_structs(rustdoc: &Value) -> anyhow::Result<Vec<Struct>> {
     Ok(structs)
 }
 
-#[derive(Debug)]
-struct Struct {
-    name: String,
-    field_ids: Vec<String>,
-}
+pub fn parse_all_struct_fields(rustdoc: &Value) -> anyhow::Result<Vec<StructField>> {
+    let index = rustdoc
+        .get("index")
+        .context("locate .index")?
+        .as_object()
+        .context("parse .index as object")?;
 
-#[derive(Debug)]
-struct StructField {
-    id: String,
-    name: String,
-    ty: String,
-}
+    let structs = index
+        .iter()
+        .flat_map(|(_, root_item)| parse_struct_field(root_item).ok())
+        .collect::<Vec<_>>();
 
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum StructFieldKind {
-    Primitive(String),
-    ResolvedPath(ResolvedPathStructField),
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct ResolvedPathStructField {
-    id: String,
-    name: String,
+    Ok(structs)
 }
 
 fn parse_struct(rustdoc: &Value) -> anyhow::Result<Struct> {
@@ -83,22 +75,25 @@ fn parse_struct(rustdoc: &Value) -> anyhow::Result<Struct> {
 }
 
 fn parse_struct_field(rustdoc: &Value) -> anyhow::Result<StructField> {
-    let struct_plain_fields = rustdoc
+    let struct_field = rustdoc
         .get("inner")
         .and_then(|i| i.get("struct_field"))
-        .and_then(|s| s.get("kind"))
-        .and_then(|s| s.get("plain"))
-        .and_then(|s| s.get("fields"))
-        .and_then(|f| f.as_array())
-        .context("locate .inner.struct.kind.plain.fields")?
-        .iter()
-        .map(|f| f.as_str())
-        .flatten()
-        .map(|f| f.to_string())
-        .collect::<Vec<_>>();
-    Ok(Struct {
-        name: rustdoc.get("name").context("locate .name")?.to_string(),
-        field_ids: struct_plain_fields,
+        .and_then(|f| serde_json::from_value(f.clone()).ok())
+        .context("locate .inner.struct.kind.plain.fields")?;
+
+    Ok(StructField {
+        id: rustdoc
+            .get("id")
+            .and_then(|t| t.as_str())
+            .map(|t| t.to_string())
+            .context("locate .id")?,
+        name: rustdoc
+            .get("name")
+            .and_then(|t| t.as_str())
+            .map(|t| t.to_string())
+            .context("locate .name")?
+            .to_string(),
+        ty: struct_field,
     })
 }
 
@@ -120,6 +115,14 @@ mod test {
 
         let structs = find_all_structs(&rustdoc).unwrap();
         panic!("{:?}", structs);
+    }
+
+    #[test]
+    fn test_parse_all_struct_fields() {
+        let rustdoc = get_test_data();
+
+        let fields = parse_all_struct_fields(&rustdoc).unwrap();
+        panic!("{:#?}", fields);
     }
 
     fn get_test_data() -> Value {
