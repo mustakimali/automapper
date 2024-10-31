@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
 use proc_macro::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use anyhow::Context;
+use quote::{format_ident, quote, ToTokens};
+use serde_json::Value;
 use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
     DeriveInput, Meta, Token,
@@ -59,28 +61,58 @@ impl Parse for Request {
 impl ToTokens for TraitImpl {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let cargo_toml_path = caller_crate_cargo_toml();
-        dbg!(&cargo_toml_path);
+        let rustdoc_path =
+            cargo_toml_path.parent().unwrap().join("rustdoc.json");
 
-        // let json_path = rustdoc_json::Builder::default()
-        //     .toolchain("nightly")
-        //     .manifest_path(&cargo_toml_path)
-        //     .document_private_items(true)
-        //     .all_features(false)
-        //     .build()
-        //     .expect("failed to build rustdoc JSON!");
+        if !rustdoc_path.exists() {
+            eprintln!("rustdoc.json does not exist at {:?}, run the cli generate this.", rustdoc_path);
+            tokens.extend(quote! {
+                panic!("rustdoc.json does not exist at {:?}, run the cli generate this.", rustdoc_path);
+            });
+            return;
+        };
 
-        // std::fs::copy(
-        //     json_path,
-        //     cargo_toml_path.parent().unwrap().join("rustdoc.json"),
-        // )
-        // .expect("failed to copy rustdoc JSON!");
+        let rustdoc_json: Value = serde_json::from_str(&std::fs::read_to_string(&rustdoc_path)
+            .expect("failed to read rustdoc.json"))
+            .expect("failed to parse rustdoc.json");
+        let (source_struct, source_fields) = rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(&self.mapping.source_type, &rustdoc_json)
+            .with_context(|| format!("failed to find source struct {} and resolve fields", self.mapping.source_type.to_string()))
+            .unwrap();
+        let (dest_struct, dest_fields) = rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(&self.mapping.dest_type, &rustdoc_json)
+            .with_context(|| format!("failed to find dest struct {} and resolve fields", self.mapping.dest_type.to_string()))
+            .unwrap();
 
-        // dbg!("Wrote rustdoc JSON to {:?}", &json_path);
+        let assignments = dest_fields
+            .into_iter()
+            .map(|f| Assignment {
+                field: f.name,
+                value: "todo!()".to_string(),
+            }).collect::<Vec<_>>();
+
+        let source_ty_name = self.mapping.source_type.clone();
+        let dest_ty_name = self.mapping.dest_type.clone();
+        let method_name = self.iden.clone();
 
         tokens.extend(quote! {
-            {
-
+            fn #method_name(source: #source_ty_name) -> #dest_ty_name {
+                #dest_ty_name {
+                    #(#assignments)*
+                }
             }
+        });
+    }
+}
+
+struct Assignment {
+    field: String,
+    value: String,
+}
+
+impl ToTokens for Assignment {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let name = format_ident!("{}", self.field.clone());
+        tokens.extend(quote! {
+            #name: source.#name,
         });
     }
 }

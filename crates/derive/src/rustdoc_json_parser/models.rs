@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Struct {
     pub name: String,
     pub field_ids: Vec<String>,
@@ -20,6 +20,6 @@ pub enum StructFieldKind {
 
 #[derive(Debug, serde::Deserialize, Clone)]
 pub struct ResolvedPathStructField {
-    pub id: String,
+    pub id: u32,
     pub name: String,
 }
