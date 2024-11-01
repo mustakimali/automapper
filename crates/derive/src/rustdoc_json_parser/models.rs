@@ -9,6 +9,7 @@ pub struct StructField {
     pub id: String,
     pub name: String,
     pub ty: StructFieldKind,
+    pub external_crate_name: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, Clone)]

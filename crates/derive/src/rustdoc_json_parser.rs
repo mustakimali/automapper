@@ -7,18 +7,24 @@ use thiserror::__private::AsDisplay;
 
 pub mod models;
 
-pub fn find_struct_and_resolve_fields_for_ident(name: &syn::Ident, rustdoc: &Value) -> anyhow::Result<(Struct, Vec<StructField>)> {
+pub fn find_struct_and_resolve_fields_for_ident(
+    name: &syn::Ident,
+    rustdoc: &Value,
+) -> anyhow::Result<(Struct, Vec<StructField>)> {
     let name = name.as_display().to_string();
     find_struct_and_resolve_fields(&name, rustdoc)
 }
 
-pub fn find_struct_and_resolve_fields(name: &str, rustdoc: &Value) -> anyhow::Result<(Struct, Vec<StructField>)> {
+pub fn find_struct_and_resolve_fields(
+    name: &str,
+    rustdoc: &Value,
+) -> anyhow::Result<(Struct, Vec<StructField>)> {
     let all_fields = parse_all_struct_fields(rustdoc)?
         .into_iter()
         .map(|f| (f.id.clone(), f))
         .collect::<HashMap<_, _>>();
 
-    let mut found_struct : Option<Struct> = None;
+    let mut found_struct: Option<Struct> = None;
 
     let fields = enumerate_structs(rustdoc)?
         .filter(|s| &s.name == name)
@@ -36,8 +42,7 @@ pub fn find_struct_and_resolve_fields(name: &str, rustdoc: &Value) -> anyhow::Re
         })
         .context("locate struct")?;
 
-    found_struct
-        .map(|s| (s, fields)).context("locate struct")
+    found_struct.map(|s| (s, fields)).context("locate struct")
 }
 
 pub fn find_all_structs(rustdoc: &Value) -> anyhow::Result<Vec<Struct>> {
@@ -69,9 +74,7 @@ pub fn parse_all_struct_fields(rustdoc: &Value) -> anyhow::Result<Vec<StructFiel
 
     let structs = index
         .iter()
-        .flat_map(|(_id, root_item)| {
-            parse_struct_field(root_item).ok()
-        })
+        .flat_map(|(_id, root_item)| parse_struct_field(root_item, rustdoc).ok())
         .collect::<Vec<_>>();
 
     Ok(structs)
@@ -83,11 +86,11 @@ fn parse_struct(rustdoc: &Value) -> anyhow::Result<Struct> {
         .as_array()
         .context("cast .inner.struct.kind.plain.fields as array")?
         .iter()
-        .map(|f|
+        .map(|f| {
             f.as_str()
                 .map(|s| s.to_string())
                 .or_else(|| f.as_u64().map(|u| u.to_string()))
-        )
+        })
         .flatten()
         .collect::<Vec<_>>();
     Ok(Struct {
@@ -96,17 +99,25 @@ fn parse_struct(rustdoc: &Value) -> anyhow::Result<Struct> {
     })
 }
 
-fn parse_struct_field(rustdoc: &Value) -> anyhow::Result<StructField> {
-    let struct_field = rustdoc
+fn parse_struct_field(rustdoc_node: &Value, rustdoc_root: &Value) -> anyhow::Result<StructField> {
+    let struct_field = rustdoc_node
         .navigate(&["inner", "struct_field"])
         .ok()
         .and_then(|f| serde_json::from_value(f.clone()).ok())
         .context("locate .inner.struct_field")?;
+    let extn_crate_name = match &struct_field {
+        StructFieldKind::Primitive(_) => None,
+        StructFieldKind::ResolvedPath(r) => rustdoc_root
+            .navigate(&["external_crates", &r.id.to_string()])
+            .ok()
+            .and_then(|n| n.get_str("name").ok()),
+    };
 
     Ok(StructField {
-        id: rustdoc.get_str("id")?,
-        name: rustdoc.get_str("name")?,
+        id: rustdoc_node.get_str("id")?,
+        name: rustdoc_node.get_str("name")?,
         ty: struct_field,
+        external_crate_name: extn_crate_name,
     })
 }
 
@@ -118,8 +129,11 @@ trait ValueExt {
 impl ValueExt for &Value {
     fn get_str(&self, key: &str) -> anyhow::Result<String> {
         self.get(key)
-            .and_then(|v| v.as_str().map(|v| v.to_string())
-                .or_else(|| v.as_number().map(|n| n.to_string())))
+            .and_then(|v| {
+                v.as_str()
+                    .map(|v| v.to_string())
+                    .or_else(|| v.as_number().map(|n| n.to_string()))
+            })
             .context(format!("locate .{}", key))
     }
 
@@ -144,7 +158,7 @@ mod test {
         assert_eq!(structs.len(), 2);
         assert_eq!(
             structs.iter().map(|s| s.name.clone()).collect::<Vec<_>>(),
-            vec!["Test2","Test"]
+            vec!["Test2", "Test"]
         );
     }
 
@@ -160,6 +174,43 @@ mod test {
         verify_fields_of_struct(&rustdoc, "Test2", &["left", "right", "expected", "name"]);
     }
 
+    #[test]
+    fn test_find_struct_with_nested_field_and_resolve_field() {
+        let rustdoc = get_real_data();
+
+        let (structs, fields) =
+            find_struct_and_resolve_fields("TestNestedField", &rustdoc).unwrap();
+        assert_eq!(5, fields.len());
+        let mut fields = fields.into_iter();
+        fields.next().unwrap(); // left
+        fields.next().unwrap(); // right
+        fields.next().unwrap(); // expected
+
+        let nested_test = fields.next().unwrap();
+        dbg!(&nested_test);
+        assert_eq!(
+            nested_test.external_crate_name.unwrap(),
+            "alloc".to_string()
+        );
+        match &nested_test.ty {
+            StructFieldKind::ResolvedPath(ResolvedPathStructField { name, .. }) => {
+                assert_eq!(name, &"Test".to_string());
+            }
+            _ => panic!("Expected ResolvedPath"),
+        }
+
+        let nested_extn_crate = fields.next().unwrap();
+        dbg!(&nested_extn_crate);
+        assert!(nested_extn_crate.external_crate_name.is_none());
+
+        match &nested_extn_crate.ty {
+            StructFieldKind::ResolvedPath(ResolvedPathStructField { name, .. }) => {
+                assert_eq!(name, &"std::path::PathBuf".to_string());
+            }
+            _ => panic!("Expected ResolvedPath"),
+        }
+    }
+
     fn verify_fields_of_struct(rustdoc: &Value, struct_name: &str, expected_fields: &[&str]) {
         let (structs, fields) = find_struct_and_resolve_fields("Test", &rustdoc).unwrap();
         assert_eq!(structs.name, "Test".to_string());
@@ -168,7 +219,6 @@ mod test {
             expected_fields
         );
     }
-
 
     #[test]
     fn test_parse_all_struct_fields() {

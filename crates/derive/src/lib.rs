@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
-use proc_macro::{Span, TokenStream};
+use crate::rustdoc_json_parser::models::{Struct, StructField};
 use anyhow::Context;
+use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use serde_json::Value;
 use syn::{
@@ -61,58 +62,146 @@ impl Parse for Request {
 impl ToTokens for TraitImpl {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let cargo_toml_path = caller_crate_cargo_toml();
-        let rustdoc_path =
-            cargo_toml_path.parent().unwrap().join("rustdoc.json");
+        let rustdoc_path = cargo_toml_path.parent().unwrap().join("rustdoc.json");
 
         if !rustdoc_path.exists() {
-            eprintln!("rustdoc.json does not exist at {:?}, run the cli generate this.", rustdoc_path);
+            eprintln!(
+                "rustdoc.json does not exist at {:?}, run the cli generate this.",
+                rustdoc_path
+            );
             tokens.extend(quote! {
                 panic!("rustdoc.json does not exist at {:?}, run the cli generate this.", rustdoc_path);
             });
             return;
         };
 
-        let rustdoc_json: Value = serde_json::from_str(&std::fs::read_to_string(&rustdoc_path)
-            .expect("failed to read rustdoc.json"))
-            .expect("failed to parse rustdoc.json");
-        let (source_struct, source_fields) = rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(&self.mapping.source_type, &rustdoc_json)
-            .with_context(|| format!("failed to find source struct {} and resolve fields", self.mapping.source_type.to_string()))
-            .unwrap();
-        let (dest_struct, dest_fields) = rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(&self.mapping.dest_type, &rustdoc_json)
-            .with_context(|| format!("failed to find dest struct {} and resolve fields", self.mapping.dest_type.to_string()))
-            .unwrap();
+        let rustdoc_json: Value = serde_json::from_str(
+            &std::fs::read_to_string(&rustdoc_path).expect("failed to read rustdoc.json"),
+        )
+        .expect("failed to parse rustdoc.json");
 
-        let assignments = dest_fields
-            .into_iter()
-            .map(|f| Assignment {
-                field: f.name,
-                value: "todo!()".to_string(),
-            }).collect::<Vec<_>>();
+        let root = Mapping::new(
+            format_ident!("value"),
+            self.mapping.source_type.clone(),
+            self.mapping.dest_type.clone(),
+            &rustdoc_json,
+        )
+        .with_context(|| {
+            format!(
+                "failed to find root struct {} and resolve fields",
+                self.mapping.source_type.to_string()
+            )
+        })
+        .unwrap();
 
         let source_ty_name = self.mapping.source_type.clone();
         let dest_ty_name = self.mapping.dest_type.clone();
         let method_name = self.iden.clone();
-
+        let method_name_rev = format_ident!("{}_rev", self.iden.clone());
         tokens.extend(quote! {
-            fn #method_name(source: #source_ty_name) -> #dest_ty_name {
-                #dest_ty_name {
-                    #(#assignments)*
-                }
+            fn #method_name(value: #source_ty_name) -> #dest_ty_name {
+                #root
             }
+        });
+    }
+}
+
+/// Generates mapping of a struct
+/// ```no_run
+/// MyType {
+///     field1: value.field1,
+///     field2: value.field2,
+/// }
+/// ```
+struct Mapping<'v> {
+    source_field_name: syn::Ident,
+    source_type: syn::Ident,
+    dest_type: syn::Ident,
+    rustdoc_json: &'v Value,
+    source_struct: Struct,
+    source_fields: Vec<StructField>,
+    dest_struct: Struct,
+    dest_fields: Vec<StructField>,
+}
+
+impl<'v> Mapping<'v> {
+    pub fn new(
+        source_field_name: syn::Ident,
+        source_type: syn::Ident,
+        dest_type: syn::Ident,
+        rustdoc_json: &'v Value,
+    ) -> anyhow::Result<Self> {
+        let (source_struct, source_fields) =
+            rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(
+                &source_type,
+                &rustdoc_json,
+            )
+            .with_context(|| {
+                format!(
+                    "failed to find source struct {} and resolve fields",
+                    source_type.to_string()
+                )
+            })?;
+        let (dest_struct, dest_fields) =
+            rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(
+                &dest_type,
+                &rustdoc_json,
+            )
+            .with_context(|| {
+                format!(
+                    "failed to find dest struct {} and resolve fields",
+                    dest_type.to_string()
+                )
+            })?;
+
+        Ok(Self {
+            source_field_name,
+            source_type,
+            dest_type,
+            rustdoc_json,
+            source_struct,
+            source_fields,
+            dest_struct,
+            dest_fields,
+        })
+    }
+}
+
+impl<'v> ToTokens for Mapping<'_> {
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let assignments = self
+            .dest_fields
+            .iter()
+            .map(|f| Assignment {
+                field: f.name.clone(),
+                value_field_name: self.source_field_name.clone(),
+                value: "todo!()".to_string(),
+            })
+            .collect::<Vec<_>>();
+
+        let source_ty_name = self.source_type.clone();
+        let dest_ty_name = self.dest_type.clone();
+        tokens.extend(quote! {
+            #dest_ty_name {
+                #(#assignments)*
+            }
+
         });
     }
 }
 
 struct Assignment {
     field: String,
+    value_field_name: syn::Ident,
     value: String,
 }
 
 impl ToTokens for Assignment {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let name = format_ident!("{}", self.field.clone());
+        let value_field = format_ident!("{}", self.value_field_name.clone());
         tokens.extend(quote! {
-            #name: source.#name,
+            #name: #value_field.#name,
         });
     }
 }
