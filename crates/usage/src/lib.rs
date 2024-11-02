@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+
 use lazy_to_map_derive::lazy_map;
 use std::path::PathBuf;
 
@@ -55,6 +56,30 @@ struct SourceInnerType {
     inner_field: u64,
 }
 
+mod nested {
+    #[derive(Clone)]
+    pub struct NestedDestType {
+        pub field: nested_inner::NestedDestInnerType,
+    }
+
+    #[derive(Clone)]
+    pub struct NestedSourceType {
+        pub field: nested_inner::NestedSourceInnerType,
+    }
+
+    pub mod nested_inner {
+        #[derive(Clone)]
+        pub struct NestedDestInnerType {
+            pub inner_field: u64,
+        }
+
+        #[derive(Clone)]
+        pub struct NestedSourceInnerType {
+            pub inner_field: u64,
+        }
+    }
+}
+
 #[test]
 fn simple_field_to_field_mappping() {
     let input = Test {
@@ -81,6 +106,20 @@ fn mapping_nested_similar_types() {
     };
     lazy_map! {
         fn source_to_dest(SourceType, DestType);
+    };
+    let result = source_to_dest(input.clone());
+    assert_eq!(result.field.inner_field, input.field.inner_field);
+}
+
+#[test]
+fn mapping_nested_similar_types_on_nested_mod() {
+    use nested::{nested_inner::NestedSourceInnerType, NestedDestType, NestedSourceType};
+    let input = NestedSourceType {
+        field: NestedSourceInnerType { inner_field: 1 },
+    };
+
+    lazy_map! {
+        fn source_to_dest(NestedSourceType, NestedDestType);
     };
     let result = source_to_dest(input.clone());
     assert_eq!(result.field.inner_field, input.field.inner_field);

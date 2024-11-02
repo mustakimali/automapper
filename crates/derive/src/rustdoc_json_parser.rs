@@ -2,21 +2,21 @@ use std::collections::HashMap;
 
 use anyhow::Context;
 use models::*;
+use quote::format_ident;
 use serde_json::Value;
 use thiserror::__private::AsDisplay;
 
 pub mod models;
 
 pub fn find_struct_and_resolve_fields_for_ident(
-    name: &syn::Ident,
+    fq_ident: &FqIdent,
     rustdoc: &Value,
 ) -> anyhow::Result<(Struct, Vec<StructField>)> {
-    let name = name.as_display().to_string();
-    find_struct_and_resolve_fields(&name, rustdoc)
+    find_struct_and_resolve_fields(fq_ident, rustdoc)
 }
 
 pub fn find_struct_and_resolve_fields(
-    name: &str,
+    fq_ident: &FqIdent,
     rustdoc: &Value,
 ) -> anyhow::Result<(Struct, Vec<StructField>)> {
     let all_fields = parse_all_struct_fields(rustdoc)?
@@ -27,7 +27,7 @@ pub fn find_struct_and_resolve_fields(
     let mut found_struct: Option<Struct> = None;
 
     let fields = enumerate_structs(rustdoc)?
-        .filter(|s| &s.name == name)
+        .filter(|s| s.name_ident().maybe_eq(fq_ident))
         .map(|s| {
             found_struct = Some(s.clone());
             s
@@ -40,7 +40,12 @@ pub fn find_struct_and_resolve_fields(
                 .flat_map(|f| all_fields.get(f.as_str()).cloned())
                 .collect::<Vec<_>>()
         })
-        .with_context(|| format!("error finding fields for struct `{}`", name))?;
+        .with_context(|| {
+            format!(
+                "error finding fields for struct `{}`",
+                fq_ident.name_string()
+            )
+        })?;
 
     found_struct.map(|s| (s, fields)).context("locate struct")
 }

@@ -7,6 +7,7 @@ use crate::rustdoc_json_parser::models::{Struct, StructField};
 use anyhow::Context;
 use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
+use rustdoc_json_parser::models::FqIdent;
 use serde_json::Value;
 use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
@@ -85,8 +86,8 @@ impl ToTokens for TraitImpl {
 
         let root = Mapping::new(
             vec![format_ident!("value")],
-            self.mapping.source_type.clone(),
-            self.mapping.dest_type.clone(),
+            FqIdent::from_idents(vec![self.mapping.source_type.clone()]),
+            FqIdent::from_idents(vec![self.mapping.dest_type.clone()]),
             &rustdoc_json,
         )
         .with_context(|| {
@@ -117,8 +118,8 @@ impl ToTokens for TraitImpl {
 /// ```
 struct Mapping<'v> {
     source_field_name: Vec<syn::Ident>,
-    source_type: syn::Ident,
-    dest_type: syn::Ident,
+    source_type: FqIdent,
+    dest_type: FqIdent,
     rustdoc_json: &'v Value,
     source_struct: Struct,
     source_fields: Vec<StructField>,
@@ -129,8 +130,8 @@ struct Mapping<'v> {
 impl<'v> Mapping<'v> {
     pub fn new(
         source_field_name: Vec<syn::Ident>,
-        source_type: syn::Ident,
-        dest_type: syn::Ident,
+        source_type: FqIdent,
+        dest_type: FqIdent,
         rustdoc_json: &'v Value,
     ) -> anyhow::Result<Self> {
         let (source_struct, source_fields) =
@@ -141,7 +142,7 @@ impl<'v> Mapping<'v> {
             .with_context(|| {
                 format!(
                     "failed to find source struct {} and resolve fields",
-                    source_type.to_string()
+                    source_type.name_string()
                 )
             })?;
         let (dest_struct, dest_fields) =
@@ -149,7 +150,7 @@ impl<'v> Mapping<'v> {
                 .with_context(|| {
                     format!(
                         "failed to find dest struct {} and resolve fields",
-                        dest_type
+                        dest_type.name_string()
                     )
                 })?;
 
@@ -197,6 +198,8 @@ impl ToTokens for Mapping<'_> {
                 //     dest_f.type_name()
                 // );
                 // dbg!(dbg_f);
+                //
+                dbg!(&source_f, &dest_f);
 
                 if dest_f.ty != source_f.ty {
                     let mut value_field_name = self.source_field_name.clone();
@@ -207,7 +210,7 @@ impl ToTokens for Mapping<'_> {
                         ty: AssignmentTy::StructMapping {
                             mapping: Mapping::new(
                                 value_field_name,
-                                source_f.type_name(),
+                                source_f.type_name(), // todo: allow namespaced path `mod::Type`
                                 dest_f.type_name(),
                                 self.rustdoc_json,
                             )
@@ -232,7 +235,8 @@ impl ToTokens for Mapping<'_> {
                 #(#assignments)*
             }
         };
-        println!("{}", struct_and_fields_mapping.to_string());
+        let o = struct_and_fields_mapping.to_string();
+        dbg!(o);
         tokens.extend(struct_and_fields_mapping);
     }
 }
