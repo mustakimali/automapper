@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
 use lazy_to_map_derive::lazy_map;
 use std::path::PathBuf;
 

@@ -138,8 +138,8 @@ impl ValueExt for &Value {
     }
 
     fn navigate(&self, keys: &[&str]) -> anyhow::Result<&Value> {
-        keys.iter().fold(Ok(self), |acc, key| {
-            acc.and_then(|v| v.get(key).context(format!("locate .{}", key)))
+        keys.iter().try_fold(*self, |acc, key| {
+            acc.get(key).context(format!("locate .{}", key))
         })
     }
 }

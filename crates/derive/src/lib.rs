@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 use std::path::PathBuf;
 
 use crate::rustdoc_json_parser::models::{Struct, StructField};
@@ -89,7 +92,7 @@ impl ToTokens for TraitImpl {
         .with_context(|| {
             format!(
                 "failed to find root struct `{}` and resolve fields. Do you need to run the cli to generate rustdoc.json",
-                self.mapping.source_type.to_string()
+                self.mapping.source_type
             )
         })
         .unwrap();
@@ -133,7 +136,7 @@ impl<'v> Mapping<'v> {
         let (source_struct, source_fields) =
             rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(
                 &source_type,
-                &rustdoc_json,
+                rustdoc_json,
             )
             .with_context(|| {
                 format!(
@@ -142,16 +145,13 @@ impl<'v> Mapping<'v> {
                 )
             })?;
         let (dest_struct, dest_fields) =
-            rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(
-                &dest_type,
-                &rustdoc_json,
-            )
-            .with_context(|| {
-                format!(
-                    "failed to find dest struct {} and resolve fields",
-                    dest_type.to_string()
-                )
-            })?;
+            rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(&dest_type, rustdoc_json)
+                .with_context(|| {
+                    format!(
+                        "failed to find dest struct {} and resolve fields",
+                        dest_type
+                    )
+                })?;
 
         Ok(Self {
             source_field_name,
@@ -174,7 +174,7 @@ impl<'v> Mapping<'v> {
     }
 }
 
-impl<'v> ToTokens for Mapping<'_> {
+impl ToTokens for Mapping<'_> {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let assignments = self
             .dest_fields
@@ -183,21 +183,20 @@ impl<'v> ToTokens for Mapping<'_> {
                 let Some(source_f) = self
                     .source_fields
                     .iter()
-                    .filter(|source_f| source_f.name == dest_f.name)
-                    .next()
+                    .find(|source_f| source_f.name == dest_f.name)
                 else {
                     panic!("field {} not found in source struct", dest_f.name);
                 };
 
-                let dbg_f = format!(
-                    "Mapping: {}.{}[{}] -> {}[{}]",
-                    self.dbg_variable_name(),
-                    source_f.name,
-                    source_f.type_name(),
-                    dest_f.name,
-                    dest_f.type_name()
-                );
-                dbg!(dbg_f);
+                // let dbg_f = format!(
+                //     "Mapping: {}.{}[{}] -> {}[{}]",
+                //     self.dbg_variable_name(),
+                //     source_f.name,
+                //     source_f.type_name(),
+                //     dest_f.name,
+                //     dest_f.type_name()
+                // );
+                // dbg!(dbg_f);
 
                 if dest_f.ty != source_f.ty {
                     let mut value_field_name = self.source_field_name.clone();
@@ -227,14 +226,13 @@ impl<'v> ToTokens for Mapping<'_> {
             })
             .collect::<Vec<_>>();
 
-        let source_ty_name = self.source_type.clone();
         let dest_ty_name = self.dest_type.clone();
         let struct_and_fields_mapping = quote! {
             #dest_ty_name {
                 #(#assignments)*
             }
         };
-        dbg!(struct_and_fields_mapping.to_string());
+        println!("{}", struct_and_fields_mapping.to_string());
         tokens.extend(struct_and_fields_mapping);
     }
 }
@@ -254,7 +252,7 @@ enum AssignmentTy<'v> {
     StructMapping { mapping: Mapping<'v> },
 }
 
-impl<'v> ToTokens for Assignment<'_> {
+impl ToTokens for Assignment<'_> {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let name = format_ident!("{}", self.field.clone());
         match &self.ty {
@@ -300,7 +298,7 @@ fn caller_crate_cargo_toml() -> PathBuf {
         if !file_name.eq_ignore_ascii_case("Cargo.toml") {
             continue;
         }
-        let Ok(cargo_toml) = std::fs::read_to_string(&entry.path()) else {
+        let Ok(cargo_toml) = std::fs::read_to_string(entry.path()) else {
             continue;
         };
         if cargo_toml
