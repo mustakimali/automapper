@@ -81,14 +81,14 @@ impl ToTokens for TraitImpl {
         .expect("failed to parse rustdoc.json");
 
         let root = Mapping::new(
-            format_ident!("value"),
+            vec![format_ident!("value")],
             self.mapping.source_type.clone(),
             self.mapping.dest_type.clone(),
             &rustdoc_json,
         )
         .with_context(|| {
             format!(
-                "failed to find root struct {} and resolve fields",
+                "failed to find root struct `{}` and resolve fields. Do you need to run the cli to generate rustdoc.json",
                 self.mapping.source_type.to_string()
             )
         })
@@ -97,7 +97,6 @@ impl ToTokens for TraitImpl {
         let source_ty_name = self.mapping.source_type.clone();
         let dest_ty_name = self.mapping.dest_type.clone();
         let method_name = self.iden.clone();
-        let method_name_rev = format_ident!("{}_rev", self.iden.clone());
         tokens.extend(quote! {
             fn #method_name(value: #source_ty_name) -> #dest_ty_name {
                 #root
@@ -114,7 +113,7 @@ impl ToTokens for TraitImpl {
 /// }
 /// ```
 struct Mapping<'v> {
-    source_field_name: syn::Ident,
+    source_field_name: Vec<syn::Ident>,
     source_type: syn::Ident,
     dest_type: syn::Ident,
     rustdoc_json: &'v Value,
@@ -126,7 +125,7 @@ struct Mapping<'v> {
 
 impl<'v> Mapping<'v> {
     pub fn new(
-        source_field_name: syn::Ident,
+        source_field_name: Vec<syn::Ident>,
         source_type: syn::Ident,
         dest_type: syn::Ident,
         rustdoc_json: &'v Value,
@@ -165,6 +164,14 @@ impl<'v> Mapping<'v> {
             dest_fields,
         })
     }
+
+    pub fn dbg_variable_name(&self) -> String {
+        self.source_field_name
+            .iter()
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(".")
+    }
 }
 
 impl<'v> ToTokens for Mapping<'_> {
@@ -172,37 +179,103 @@ impl<'v> ToTokens for Mapping<'_> {
         let assignments = self
             .dest_fields
             .iter()
-            .map(|f| Assignment {
-                field: f.name.clone(),
-                value_field_name: self.source_field_name.clone(),
-                value: "todo!()".to_string(),
+            .map(|dest_f| {
+                let Some(source_f) = self
+                    .source_fields
+                    .iter()
+                    .filter(|source_f| source_f.name == dest_f.name)
+                    .next()
+                else {
+                    panic!("field {} not found in source struct", dest_f.name);
+                };
+
+                let dbg_f = format!(
+                    "Mapping: {}.{}[{}] -> {}[{}]",
+                    self.dbg_variable_name(),
+                    source_f.name,
+                    source_f.type_name(),
+                    dest_f.name,
+                    dest_f.type_name()
+                );
+                dbg!(dbg_f);
+
+                if dest_f.ty != source_f.ty {
+                    let mut value_field_name = self.source_field_name.clone();
+                    value_field_name.push(format_ident!("{}", source_f.name));
+
+                    return Assignment {
+                        field: dest_f.name.clone(),
+                        ty: AssignmentTy::StructMapping {
+                            mapping: Mapping::new(
+                                value_field_name,
+                                source_f.type_name(),
+                                dest_f.type_name(),
+                                self.rustdoc_json,
+                            )
+                            .unwrap(),
+                        },
+                    };
+                }
+
+                Assignment {
+                    field: dest_f.name.clone(),
+                    ty: AssignmentTy::DirectMapping {
+                        value_field_name: self.source_field_name.clone(),
+                        value: dest_f.name.clone(),
+                    },
+                }
             })
             .collect::<Vec<_>>();
 
         let source_ty_name = self.source_type.clone();
         let dest_ty_name = self.dest_type.clone();
-        tokens.extend(quote! {
+        let struct_and_fields_mapping = quote! {
             #dest_ty_name {
                 #(#assignments)*
             }
-
-        });
+        };
+        dbg!(struct_and_fields_mapping.to_string());
+        tokens.extend(struct_and_fields_mapping);
     }
 }
 
-struct Assignment {
+struct Assignment<'v> {
     field: String,
-    value_field_name: syn::Ident,
-    value: String,
+    ty: AssignmentTy<'v>,
 }
 
-impl ToTokens for Assignment {
+enum AssignmentTy<'v> {
+    /// Direct mapping of a field
+    DirectMapping {
+        value_field_name: Vec<syn::Ident>,
+        value: String,
+    },
+    /// Require creation of a new struct
+    StructMapping { mapping: Mapping<'v> },
+}
+
+impl<'v> ToTokens for Assignment<'_> {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let name = format_ident!("{}", self.field.clone());
-        let value_field = format_ident!("{}", self.value_field_name.clone());
-        tokens.extend(quote! {
-            #name: #value_field.#name,
-        });
+        match &self.ty {
+            AssignmentTy::DirectMapping {
+                value_field_name: source_field_name,
+                value: _value, //todo: use value
+            } => {
+                let source_field_accesor = source_field_name
+                    .iter()
+                    .map(|i| quote! {#i})
+                    .collect::<Vec<_>>();
+                tokens.extend(quote! {
+                    #name: #(#source_field_accesor).*.#name,
+                });
+            }
+            AssignmentTy::StructMapping { mapping } => {
+                tokens.extend(quote! {
+                    #name: #mapping,
+                });
+            }
+        }
     }
 }
 

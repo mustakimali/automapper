@@ -18,7 +18,9 @@ fn main() {
 
     println!("Copying {:?} to {:?}", json_path, dest_json);
 
-    std::fs::copy(&json_path, dest_json).expect("failed to copy rustdoc JSON!");
+    std::fs::copy(&json_path, &dest_json).expect("failed to copy rustdoc JSON!");
+    println!("Generated rustdoc json for: {:?}", cargo_toml_path);
+    println!("Saved to {:?}", dest_json);
 }
 
 /// Returns the root path of the crate that calls this function.

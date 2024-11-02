@@ -40,7 +40,7 @@ pub fn find_struct_and_resolve_fields(
                 .flat_map(|f| all_fields.get(f.as_str()).cloned())
                 .collect::<Vec<_>>()
         })
-        .context("locate struct")?;
+        .with_context(|| format!("error finding fields for struct `{}`", name))?;
 
     found_struct.map(|s| (s, fields)).context("locate struct")
 }
