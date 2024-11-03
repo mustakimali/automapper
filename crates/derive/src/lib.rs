@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use crate::rustdoc_json_parser::models::{Struct, StructField};
 use anyhow::Context;
 use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
-use rustdoc_json_parser::models::FqIdent;
+use rustdoc_json_parser::models::{FqIdent, PathCache};
 use serde_json::Value;
 use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
@@ -23,6 +23,21 @@ struct TraitImpl {
     paren_token: token::Paren,
     mapping: Request,
     semi_token: Token![;],
+}
+
+#[derive(Clone, Debug)]
+struct WrappedMacroContext(Arc<MacroContext>);
+
+impl WrappedMacroContext {
+    pub fn inner(&self) -> &MacroContext {
+        &self.0
+    }
+}
+
+#[derive(Debug)]
+struct MacroContext {
+    pub rustdoc: Value,
+    pub path_cache: PathCache,
 }
 
 #[derive(Clone)]
