@@ -14,7 +14,7 @@ impl MacroCtx {
 }
 
 #[derive(Debug)]
-struct MacroContextInner {
-    pub rustdoc: Value,
-    pub path_cache: PathCache,
+pub struct MacroContextInner {
+    rustdoc: Value,
+    path_cache: PathCache,
 }
