@@ -25,21 +25,6 @@ struct TraitImpl {
     semi_token: Token![;],
 }
 
-#[derive(Clone, Debug)]
-struct WrappedMacroContext(Arc<MacroContext>);
-
-impl WrappedMacroContext {
-    pub fn inner(&self) -> &MacroContext {
-        &self.0
-    }
-}
-
-#[derive(Debug)]
-struct MacroContext {
-    pub rustdoc: Value,
-    pub path_cache: PathCache,
-}
-
 #[derive(Clone)]
 struct Request {
     source_type: syn::Path,

@@ -3,9 +3,11 @@ use std::path::Display;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
+pub use ctx::MacroCtx;
 pub use fq_ident::FqIdent;
 pub use path_dict::PathCache;
 
+mod ctx;
 mod fq_ident;
 mod path_dict;
 
