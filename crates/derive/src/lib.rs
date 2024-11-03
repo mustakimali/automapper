@@ -27,9 +27,9 @@ struct TraitImpl {
 
 #[derive(Clone)]
 struct Request {
-    source_type: syn::Ident,
+    source_type: syn::Path,
     _coma: syn::Token![,],
-    dest_type: syn::Ident,
+    dest_type: syn::Path,
 }
 
 #[proc_macro]
@@ -86,13 +86,13 @@ impl ToTokens for TraitImpl {
 
         let root = Mapping::new(
             vec![format_ident!("value")],
-            FqIdent::from_idents(vec![self.mapping.source_type.clone()]),
-            FqIdent::from_idents(vec![self.mapping.dest_type.clone()]),
+            FqIdent::from_path(self.mapping.source_type.clone()),
+            FqIdent::from_path(self.mapping.dest_type.clone()),
             &rustdoc_json,
         )
         .with_context(|| {
             format!(
-                "failed to find root struct `{}` and resolve fields. Do you need to run the cli to generate rustdoc.json",
+                "failed to find root struct `{:?}` and resolve fields. Do you need to run the cli to generate rustdoc.json",
                 self.mapping.source_type
             )
         })
@@ -199,18 +199,21 @@ impl ToTokens for Mapping<'_> {
                 // );
                 // dbg!(dbg_f);
                 //
-                dbg!(&source_f, &dest_f);
+                //dbg!(&source_f, &dest_f);
 
                 if dest_f.ty != source_f.ty {
                     let mut value_field_name = self.source_field_name.clone();
                     value_field_name.push(format_ident!("{}", source_f.name));
+
+                    dbg!(&dest_f);
+                    println!("Mapping: {}", self.dest_type);
 
                     return Assignment {
                         field: dest_f.name.clone(),
                         ty: AssignmentTy::StructMapping {
                             mapping: Mapping::new(
                                 value_field_name,
-                                source_f.type_name(), // todo: allow namespaced path `mod::Type`
+                                source_f.type_name(),
                                 dest_f.type_name(),
                                 self.rustdoc_json,
                             )

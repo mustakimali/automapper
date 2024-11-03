@@ -119,7 +119,7 @@ fn mapping_nested_similar_types_on_nested_mod() {
     };
 
     lazy_map! {
-        fn source_to_dest(NestedSourceType, NestedDestType);
+        fn source_to_dest(nested::NestedSourceType, nested::NestedDestType);
     };
     let result = source_to_dest(input.clone());
     assert_eq!(result.field.inner_field, input.field.inner_field);

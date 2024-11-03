@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Context;
 use models::*;
@@ -54,6 +54,36 @@ pub fn find_all_structs(rustdoc: &Value) -> anyhow::Result<Vec<Struct>> {
     let structs = enumerate_structs(rustdoc)?;
 
     Ok(structs.collect::<Vec<_>>())
+}
+
+pub fn find_all_struct_and_fq_path(rustdoc: &Value) -> anyhow::Result<HashSet<FqIdent>> {
+    let mut fq_idents = HashSet::new();
+    let index = rustdoc
+        .get("paths")
+        .context("locate .paths")?
+        .as_object()
+        .context("parse .paths as object")?;
+    for (_, root_item) in index.iter() {
+        let Some(kind) = root_item.get_str("kind").ok() else {
+            continue;
+        };
+        if kind == "struct" {
+            let fq_path = root_item
+                .get("path")
+                .context("locate .path")?
+                .as_array()
+                .context("parse .path as array")?;
+            let s = fq_path
+                .iter()
+                .flat_map(|s| s.as_str())
+                .map(|s| format_ident!("{}", s))
+                .collect::<Vec<_>>();
+
+            fq_idents.insert(FqIdent::from_idents(s));
+        }
+    }
+
+    Ok(fq_idents)
 }
 
 fn enumerate_structs(
@@ -184,7 +214,7 @@ mod test {
         let rustdoc = get_real_data();
 
         let (structs, fields) =
-            find_struct_and_resolve_fields("TestNestedField", &rustdoc).unwrap();
+            find_struct_and_resolve_fields(&str_to_fq_ident("TestNestedField"), &rustdoc).unwrap();
         assert_eq!(5, fields.len());
         let mut fields = fields.into_iter();
         fields.next().unwrap(); // left
@@ -217,7 +247,8 @@ mod test {
     }
 
     fn verify_fields_of_struct(rustdoc: &Value, struct_name: &str, expected_fields: &[&str]) {
-        let (structs, fields) = find_struct_and_resolve_fields("Test", &rustdoc).unwrap();
+        let (structs, fields) =
+            find_struct_and_resolve_fields(&str_to_fq_ident("Test"), &rustdoc).unwrap();
         assert_eq!(structs.name, "Test".to_string());
         assert_eq!(
             fields.iter().map(|s| s.name.clone()).collect::<Vec<_>>(),
@@ -233,6 +264,14 @@ mod test {
         assert_eq!(fields.len(), 8);
     }
 
+    #[test]
+    fn test_find_all_struct_and_fq_path() {
+        let rustdoc = get_test_data();
+
+        let structs = find_all_struct_and_fq_path(&rustdoc).unwrap();
+        assert_eq!(structs.len(), 1662);
+    }
+
     fn get_test_data() -> Value {
         let json = include_str!("../rustdoc_sample.json");
         let rustdoc: Value = serde_json::from_str(json).unwrap();
@@ -243,5 +282,13 @@ mod test {
         let json = include_str!("../../usage/rustdoc.json");
         let rustdoc: Value = serde_json::from_str(json).unwrap();
         rustdoc
+    }
+
+    fn str_to_fq_ident(s: &str) -> FqIdent {
+        FqIdent::from_idents(
+            s.split("::")
+                .map(|s| format_ident!("{}", s))
+                .collect::<Vec<_>>(),
+        )
     }
 }

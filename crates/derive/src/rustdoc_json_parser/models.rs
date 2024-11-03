@@ -1,9 +1,27 @@
+use std::path::Display;
+
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct FqIdent {
     pub path: Vec<syn::Ident>,
+}
+
+pub struct PathDict {
+    pub path: Vec<FqIdent>,
+}
+
+impl std::fmt::Display for FqIdent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, ident) in self.path.iter().enumerate() {
+            if i > 0 {
+                write!(f, "::")?;
+            }
+            write!(f, "{}", ident)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -93,6 +111,15 @@ impl FqIdent {
 
     pub fn from_idents(idents: Vec<syn::Ident>) -> Self {
         Self { path: idents }
+    }
+
+    pub fn from_path(path: syn::Path) -> Self {
+        let segments = path
+            .segments
+            .iter()
+            .map(|s| s.ident.clone())
+            .collect::<Vec<_>>();
+        Self { path: segments }
     }
 
     pub fn name(&self) -> &[syn::Ident] {
