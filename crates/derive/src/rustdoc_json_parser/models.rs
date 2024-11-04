@@ -3,7 +3,7 @@ use std::path::Display;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
-pub use ctx::MacroCtx;
+pub use ctx::{MacroCtx, MacroContextInner};
 pub use fq_ident::FqIdent;
 pub use path_dict::PathCache;
 

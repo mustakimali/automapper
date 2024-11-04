@@ -3,7 +3,7 @@
 
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use crate::rustdoc_json_parser::models::{Struct, StructField};
+use crate::rustdoc_json_parser::models::{MacroContextInner, MacroCtx, Struct, StructField};
 use anyhow::Context;
 use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
@@ -82,7 +82,15 @@ impl ToTokens for TraitImpl {
         let rustdoc_json: Value = serde_json::from_str(
             &std::fs::read_to_string(&rustdoc_path).expect("failed to read rustdoc.json"),
         )
-        .expect("failed to parse rustdoc.json");
+            .expect("failed to parse rustdoc.json");
+
+        let path_cache = rustdoc_json_parser::find_all_struct_and_fq_path(&rustdoc_json)
+            .expect("failed to find all struct and fq path")
+            .into_iter().collect::<Vec<_>>();
+        let ctx = MacroCtx(Arc::new(MacroContextInner {
+            rustdoc_json,
+            path_cache: PathCache::new(path_cache),
+        }));
 
         let root = Mapping::new(
             vec![format_ident!("value")],
@@ -90,13 +98,13 @@ impl ToTokens for TraitImpl {
             FqIdent::from_path(self.mapping.dest_type.clone()),
             &rustdoc_json,
         )
-        .with_context(|| {
-            format!(
-                "failed to find root struct `{:?}` and resolve fields. Do you need to run the cli to generate rustdoc.json",
-                self.mapping.source_type
-            )
-        })
-        .unwrap();
+            .with_context(|| {
+                format!(
+                    "failed to find root struct `{:?}` and resolve fields. Do you need to run the cli to generate rustdoc.json",
+                    self.mapping.source_type
+                )
+            })
+            .unwrap();
 
         let source_ty_name = self.mapping.source_type.clone();
         let dest_ty_name = self.mapping.dest_type.clone();
@@ -116,37 +124,37 @@ impl ToTokens for TraitImpl {
 ///     field2: value.field2,
 /// }
 /// ```
-struct Mapping<'v> {
+struct Mapping {
     source_field_name: Vec<syn::Ident>,
     source_type: FqIdent,
     dest_type: FqIdent,
-    rustdoc_json: &'v Value,
     source_struct: Struct,
     source_fields: Vec<StructField>,
     dest_struct: Struct,
     dest_fields: Vec<StructField>,
+    ctx: MacroCtx,
 }
 
-impl<'v> Mapping<'v> {
+impl Mapping {
     pub fn new(
         source_field_name: Vec<syn::Ident>,
         source_type: FqIdent,
         dest_type: FqIdent,
-        rustdoc_json: &'v Value,
+        ctx: MacroCtx,
     ) -> anyhow::Result<Self> {
         let (source_struct, source_fields) =
             rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(
                 &source_type,
-                rustdoc_json,
+                &ctx.rustdoc_json,
             )
-            .with_context(|| {
-                format!(
-                    "failed to find source struct {} and resolve fields",
-                    source_type.name_string()
-                )
-            })?;
+                .with_context(|| {
+                    format!(
+                        "failed to find source struct {} and resolve fields",
+                        source_type.name_string()
+                    )
+                })?;
         let (dest_struct, dest_fields) =
-            rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(&dest_type, rustdoc_json)
+            rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(&dest_type, &ctx.rustdoc_json)
                 .with_context(|| {
                     format!(
                         "failed to find dest struct {} and resolve fields",
@@ -158,11 +166,11 @@ impl<'v> Mapping<'v> {
             source_field_name,
             source_type,
             dest_type,
-            rustdoc_json,
             source_struct,
             source_fields,
             dest_struct,
             dest_fields,
+            ctx,
         })
     }
 
@@ -217,7 +225,7 @@ impl ToTokens for Mapping<'_> {
                                 dest_f.type_name(),
                                 self.rustdoc_json,
                             )
-                            .unwrap(),
+                                .unwrap(),
                         },
                     };
                 }
@@ -244,19 +252,19 @@ impl ToTokens for Mapping<'_> {
     }
 }
 
-struct Assignment<'v> {
+struct Assignment {
     field: String,
-    ty: AssignmentTy<'v>,
+    ty: AssignmentTy,
 }
 
-enum AssignmentTy<'v> {
+enum AssignmentTy {
     /// Direct mapping of a field
     DirectMapping {
         value_field_name: Vec<syn::Ident>,
         value: String,
     },
     /// Require creation of a new struct
-    StructMapping { mapping: Mapping<'v> },
+    StructMapping { mapping: Mapping },
 }
 
 impl ToTokens for Assignment<'_> {

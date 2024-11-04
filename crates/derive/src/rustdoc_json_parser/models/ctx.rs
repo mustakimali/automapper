@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -15,6 +16,14 @@ impl MacroCtx {
 
 #[derive(Debug)]
 pub struct MacroContextInner {
-    rustdoc: Value,
-    path_cache: PathCache,
+    pub rustdoc_json: Value,
+    pub path_cache: PathCache,
+}
+
+impl Deref for MacroCtx {
+    type Target = MacroContextInner;
+
+    fn deref(&self) -> &Self::Target {
+        self.inner()
+    }
 }
