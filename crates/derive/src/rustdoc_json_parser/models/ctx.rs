@@ -1,4 +1,5 @@
 use std::ops::Deref;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use serde_json::Value;
@@ -6,9 +7,12 @@ use serde_json::Value;
 use super::PathCache;
 
 #[derive(Clone, Debug)]
-pub struct MacroCtx(Arc<MacroContextInner>);
+pub struct MacroCtx(Rc<MacroContextInner>);
 
 impl MacroCtx {
+    pub fn new(ctx: MacroContextInner) -> Self {
+        Self(Rc::new(ctx))
+    }
     pub fn inner(&self) -> &MacroContextInner {
         &self.0
     }

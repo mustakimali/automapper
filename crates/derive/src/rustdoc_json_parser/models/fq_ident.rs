@@ -46,6 +46,13 @@ impl FqIdent {
     pub fn maybe_eq(&self, other: &Self) -> bool {
         self.path == other.path || self.path.last() == other.path.last()
     }
+
+    pub fn crate_scoped(&self) -> Self {
+        let mut path = self.path.clone();
+        path.remove(0);
+        path.insert(0, format_ident!("crate"));
+        Self { path }
+    }
 }
 
 impl ToTokens for FqIdent {

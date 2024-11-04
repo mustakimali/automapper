@@ -82,21 +82,22 @@ impl ToTokens for TraitImpl {
         let rustdoc_json: Value = serde_json::from_str(
             &std::fs::read_to_string(&rustdoc_path).expect("failed to read rustdoc.json"),
         )
-            .expect("failed to parse rustdoc.json");
+        .expect("failed to parse rustdoc.json");
 
         let path_cache = rustdoc_json_parser::find_all_struct_and_fq_path(&rustdoc_json)
             .expect("failed to find all struct and fq path")
-            .into_iter().collect::<Vec<_>>();
-        let ctx = MacroCtx(Arc::new(MacroContextInner {
+            .into_iter()
+            .collect::<Vec<_>>();
+        let ctx = MacroCtx::new(MacroContextInner {
             rustdoc_json,
             path_cache: PathCache::new(path_cache),
-        }));
+        });
 
         let root = Mapping::new(
             vec![format_ident!("value")],
             FqIdent::from_path(self.mapping.source_type.clone()),
             FqIdent::from_path(self.mapping.dest_type.clone()),
-            &rustdoc_json,
+            ctx,
         )
             .with_context(|| {
                 format!(
@@ -147,20 +148,23 @@ impl Mapping {
                 &source_type,
                 &ctx.rustdoc_json,
             )
-                .with_context(|| {
-                    format!(
-                        "failed to find source struct {} and resolve fields",
-                        source_type.name_string()
-                    )
-                })?;
+            .with_context(|| {
+                format!(
+                    "failed to find source struct {} and resolve fields",
+                    source_type.name_string()
+                )
+            })?;
         let (dest_struct, dest_fields) =
-            rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(&dest_type, &ctx.rustdoc_json)
-                .with_context(|| {
-                    format!(
-                        "failed to find dest struct {} and resolve fields",
-                        dest_type.name_string()
-                    )
-                })?;
+            rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(
+                &dest_type,
+                &ctx.rustdoc_json,
+            )
+            .with_context(|| {
+                format!(
+                    "failed to find dest struct {} and resolve fields",
+                    dest_type.name_string()
+                )
+            })?;
 
         Ok(Self {
             source_field_name,
@@ -183,7 +187,7 @@ impl Mapping {
     }
 }
 
-impl ToTokens for Mapping<'_> {
+impl ToTokens for Mapping {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let assignments = self
             .dest_fields
@@ -223,9 +227,9 @@ impl ToTokens for Mapping<'_> {
                                 value_field_name,
                                 source_f.type_name(),
                                 dest_f.type_name(),
-                                self.rustdoc_json,
+                                self.ctx.clone(),
                             )
-                                .unwrap(),
+                            .unwrap(),
                         },
                     };
                 }
@@ -241,8 +245,14 @@ impl ToTokens for Mapping<'_> {
             .collect::<Vec<_>>();
 
         let dest_ty_name = self.dest_type.clone();
+        let dest_ty_path = self
+            .ctx
+            .path_cache
+            .find(self.dest_type.name())
+            .map(|f| f.crate_scoped())
+            .expect("find fully qualified path");
         let struct_and_fields_mapping = quote! {
-            #dest_ty_name {
+            #dest_ty_path {
                 #(#assignments)*
             }
         };
@@ -267,7 +277,7 @@ enum AssignmentTy {
     StructMapping { mapping: Mapping },
 }
 
-impl ToTokens for Assignment<'_> {
+impl ToTokens for Assignment {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let name = format_ident!("{}", self.field.clone());
         match &self.ty {

@@ -12,10 +12,8 @@ impl PathCache {
         Self { path: idents }
     }
 
-    pub fn find(&self, name: &syn::Ident) -> Option<&FqIdent> {
-        self.path
-            .iter()
-            .find(|i| i.path.last().filter(|l| l == &name).is_some())
+    pub fn find(&self, name: &[syn::Ident]) -> Option<&FqIdent> {
+        self.path.iter().find(|i| i.path.ends_with(name))
     }
 
     pub fn find_by_path(&self, name: &syn::Path) -> Option<&FqIdent> {
@@ -24,7 +22,8 @@ impl PathCache {
             .iter()
             .map(|s| s.ident.clone())
             .collect::<Vec<_>>();
-        self.path.iter().find(|i| i.path.ends_with(&seg))
+
+        self.find(&seg)
     }
 }
 
@@ -42,7 +41,7 @@ mod test {
             format_ident!("Path"),
         ])]);
 
-        assert!(cache.find(&format_ident!("Path")).is_some());
+        assert!(cache.find(&[format_ident!("Path")]).is_some());
         //assert!(cache.find_by_path(syn::Path::parse).is_some()) // todo: test
     }
 }
