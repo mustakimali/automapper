@@ -16,6 +16,9 @@ impl MacroCtx {
     pub fn inner(&self) -> &MacroContextInner {
         &self.0
     }
+    pub fn count(&self) -> usize {
+        Rc::strong_count(&self.0)
+    }
 }
 
 #[derive(Debug)]

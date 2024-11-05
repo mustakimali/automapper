@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -euo pipefail
+set -eu pipefail
 
 rm ../usage/rustdoc.json || true
 cargo check --all || true

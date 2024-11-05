@@ -2,6 +2,7 @@
 #![allow(unused_imports)]
 
 use lazy_to_map_derive::lazy_map;
+use nested::nested_inner::NestedDestInnerType;
 use std::path::PathBuf;
 
 #[derive(Clone)]
@@ -54,6 +55,11 @@ struct SourceType {
 #[derive(Clone)]
 struct SourceInnerType {
     inner_field: u64,
+}
+
+#[derive(Clone)]
+struct SourceInnerTypeWthDifferentInnerTypeCanBeCasted {
+    inner_field: i32,
 }
 
 mod nested {
@@ -123,4 +129,14 @@ fn mapping_nested_similar_types_on_nested_mod() {
     };
     let result = source_to_dest(input.clone());
     assert_eq!(result.field.inner_field, input.field.inner_field);
+}
+
+#[test]
+fn mapping_casts_primitive_types() {
+    let input = SourceInnerType { inner_field: 50 };
+    lazy_map! {
+        fn source_to_dest(SourceInnerType, SourceInnerTypeWthDifferentInnerTypeCanBeCasted);
+    };
+    let result = source_to_dest(input.clone());
+    assert_eq!(result.inner_field, input.inner_field as _);
 }

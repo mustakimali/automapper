@@ -93,16 +93,17 @@ impl ToTokens for TraitImpl {
             path_cache: PathCache::new(path_cache),
         });
 
-        let root = Mapping::new(
+        let root = StructMapping::new(
             vec![format_ident!("value")],
             FqIdent::from_path(self.mapping.source_type.clone()),
             FqIdent::from_path(self.mapping.dest_type.clone()),
             ctx,
+            true,
         )
             .with_context(|| {
                 format!(
-                    "failed to find root struct `{:?}` and resolve fields. Do you need to run the cli to generate rustdoc.json",
-                    self.mapping.source_type
+                    "failed to find root struct `{}` and resolve fields. Do you need to run the cli to generate rustdoc.json",
+                    self.mapping.source_type.to_token_stream().to_string()
                 )
             })
             .unwrap();
@@ -125,7 +126,7 @@ impl ToTokens for TraitImpl {
 ///     field2: value.field2,
 /// }
 /// ```
-struct Mapping {
+struct StructMapping {
     source_field_name: Vec<syn::Ident>,
     source_type: FqIdent,
     dest_type: FqIdent,
@@ -134,14 +135,16 @@ struct Mapping {
     dest_struct: Struct,
     dest_fields: Vec<StructField>,
     ctx: MacroCtx,
+    is_root: bool,
 }
 
-impl Mapping {
+impl StructMapping {
     pub fn new(
         source_field_name: Vec<syn::Ident>,
         source_type: FqIdent,
         dest_type: FqIdent,
         ctx: MacroCtx,
+        is_root: bool,
     ) -> anyhow::Result<Self> {
         let (source_struct, source_fields) =
             rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(
@@ -175,6 +178,7 @@ impl Mapping {
             dest_struct,
             dest_fields,
             ctx,
+            is_root,
         })
     }
 
@@ -185,9 +189,56 @@ impl Mapping {
             .collect::<Vec<_>>()
             .join(".")
     }
+
+    fn mapping_field_same_type(&self, dest_f: &StructField) -> FieldAssignment {
+        FieldAssignment {
+            field: dest_f.name.clone(),
+            source_ty: self.source_type.clone(),
+            dest_ty: self.dest_type.clone(),
+            ty: AssignmentTy::DirectMapping {
+                value_field_name: self.source_field_name.clone(),
+            },
+        }
+    }
+
+    fn mapping_field_with_cast(&self, dest_f: &StructField) -> FieldAssignment {
+        FieldAssignment {
+            field: dest_f.name.clone(),
+            source_ty: self.source_type.clone(),
+            dest_ty: self.dest_type.clone(),
+            ty: AssignmentTy::DirectMappingWithCast {
+                value_field_name: self.source_field_name.clone(),
+            },
+        }
+    }
+
+    fn mapping_field_struct(
+        &self,
+        source_f: &StructField,
+        dest_f: &StructField,
+    ) -> FieldAssignment {
+        let mut value_field_name = self.source_field_name.clone();
+        value_field_name.push(format_ident!("{}", source_f.name));
+        println!("Mapping: {}", self.dest_type);
+        FieldAssignment {
+            field: dest_f.name.clone(),
+            source_ty: source_f.type_name(),
+            dest_ty: dest_f.type_name(),
+            ty: AssignmentTy::StructMapping {
+                mapping: StructMapping::new(
+                    value_field_name,
+                    source_f.type_name(),
+                    dest_f.type_name(),
+                    self.ctx.clone(),
+                    false,
+                )
+                .unwrap(),
+            },
+        }
+    }
 }
 
-impl ToTokens for Mapping {
+impl ToTokens for StructMapping {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let assignments = self
             .dest_fields
@@ -213,38 +264,17 @@ impl ToTokens for Mapping {
                 //
                 //dbg!(&source_f, &dest_f);
 
-                if dest_f.ty != source_f.ty {
-                    let mut value_field_name = self.source_field_name.clone();
-                    value_field_name.push(format_ident!("{}", source_f.name));
-
-                    dbg!(&dest_f);
-                    println!("Mapping: {}", self.dest_type);
-
-                    return Assignment {
-                        field: dest_f.name.clone(),
-                        ty: AssignmentTy::StructMapping {
-                            mapping: Mapping::new(
-                                value_field_name,
-                                source_f.type_name(),
-                                dest_f.type_name(),
-                                self.ctx.clone(),
-                            )
-                            .unwrap(),
-                        },
-                    };
-                }
-
-                Assignment {
-                    field: dest_f.name.clone(),
-                    ty: AssignmentTy::DirectMapping {
-                        value_field_name: self.source_field_name.clone(),
-                        value: dest_f.name.clone(),
-                    },
+                // TODO: custom mapping
+                if dest_f.ty == source_f.ty {
+                    self.mapping_field_same_type(dest_f)
+                } else if dest_f.is_primitive() && source_f.is_primitive() {
+                    self.mapping_field_with_cast(dest_f)
+                } else {
+                    self.mapping_field_struct(source_f, dest_f)
                 }
             })
             .collect::<Vec<_>>();
 
-        let dest_ty_name = self.dest_type.clone();
         let dest_ty_path = self
             .ctx
             .path_cache
@@ -256,14 +286,19 @@ impl ToTokens for Mapping {
                 #(#assignments)*
             }
         };
-        let o = struct_and_fields_mapping.to_string();
-        dbg!(o);
+        if self.is_root {
+            let o = struct_and_fields_mapping.to_string();
+            dbg!(o);
+        }
+
         tokens.extend(struct_and_fields_mapping);
     }
 }
 
-struct Assignment {
+struct FieldAssignment {
     field: String,
+    source_ty: FqIdent,
+    dest_ty: FqIdent,
     ty: AssignmentTy,
 }
 
@@ -271,19 +306,25 @@ enum AssignmentTy {
     /// Direct mapping of a field
     DirectMapping {
         value_field_name: Vec<syn::Ident>,
-        value: String,
+    },
+    DirectMappingWithCast {
+        value_field_name: Vec<syn::Ident>,
     },
     /// Require creation of a new struct
-    StructMapping { mapping: Mapping },
+    StructMapping {
+        mapping: StructMapping,
+    },
 }
 
-impl ToTokens for Assignment {
+impl ToTokens for FieldAssignment {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        let a = format!("Mapping: {} -> {}", self.source_ty, self.dest_ty);
+        dbg!(a);
+
         let name = format_ident!("{}", self.field.clone());
         match &self.ty {
             AssignmentTy::DirectMapping {
                 value_field_name: source_field_name,
-                value: _value, //todo: use value
             } => {
                 let source_field_accesor = source_field_name
                     .iter()
@@ -291,6 +332,15 @@ impl ToTokens for Assignment {
                     .collect::<Vec<_>>();
                 tokens.extend(quote! {
                     #name: #(#source_field_accesor).*.#name,
+                });
+            }
+            AssignmentTy::DirectMappingWithCast { value_field_name } => {
+                let source_field_accesor = value_field_name
+                    .iter()
+                    .map(|i| quote! {#i})
+                    .collect::<Vec<_>>();
+                tokens.extend(quote! {
+                    #name: #(#source_field_accesor).*.#name as _,
                 });
             }
             AssignmentTy::StructMapping { mapping } => {
