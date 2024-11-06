@@ -1,4 +1,4 @@
-use std::path::Display;
+use std::{hash::Hash, path::Display};
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
@@ -11,46 +11,85 @@ mod ctx;
 mod fq_ident;
 mod path_dict;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Id(String);
+
+impl From<String> for Id {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
 pub enum RustType {
-    Struct(Struct),
-    Enum(Enum),
+    Struct {
+        item: Struct,
+        fields: Vec<StructField>,
+    },
+    Enum {
+        item: Enum,
+        variants: Vec<EnumVariant>,
+    },
 }
 
 impl RustType {
     pub fn name(&self) -> &str {
         match self {
-            RustType::Struct(s) => &s.name,
-            RustType::Enum(e) => &e.name,
+            RustType::Struct { item, .. } => &item.name,
+            RustType::Enum { item, .. } => &item.name,
         }
     }
 
     pub fn is_struct(&self) -> bool {
-        matches!(self, RustType::Struct(_))
+        matches!(self, RustType::Struct { .. })
     }
 
     pub fn is_enum(&self) -> bool {
-        matches!(self, RustType::Enum(_))
+        matches!(self, RustType::Enum { .. })
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Struct {
     pub name: String,
-    pub field_ids: Vec<String>,
+    pub field_ids: Vec<Id>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Enum {
     pub name: String,
-    pub variant_ids: Vec<String>,
+    pub variant_ids: Vec<Id>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StructField {
-    pub id: String,
+    pub id: Id,
     pub name: String,
     pub ty: StructFieldKind,
     pub external_crate_name: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumVariant {
+    pub id: Id,
+    pub name: String,
+    pub ty: EnumVariantKind,
+}
+
+impl Hash for EnumVariant {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+impl Hash for StructField {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+#[derive(Debug, serde::Deserialize, Clone, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum EnumVariantKind {
+    Plain,
 }
 
 impl StructField {

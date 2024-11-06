@@ -37,7 +37,7 @@ pub fn find_struct_and_resolve_fields(
         .map(|field_ids| {
             field_ids
                 .into_iter()
-                .flat_map(|f| all_fields.get(f.as_str()).cloned())
+                .flat_map(|id| all_fields.get(&id).cloned())
                 .collect::<Vec<_>>()
         })
         .with_context(|| {
@@ -60,8 +60,8 @@ fn enumerate_structs(
     rustdoc: &Value,
 ) -> Result<impl Iterator<Item = Struct> + use<'_>, anyhow::Error> {
     let strcuts = enumerate_rust_types(rustdoc)?.flat_map(|s| match s {
-        RustType::Struct(s) => Some(s),
-        RustType::Enum(_) => None,
+        RustType::Struct { item, .. } => Some(item),
+        RustType::Enum { .. } => None,
     });
 
     Ok(strcuts)
@@ -69,8 +69,8 @@ fn enumerate_structs(
 
 fn enumerate_enums(rustdoc: &Value) -> Result<impl Iterator<Item = Enum> + use<'_>, anyhow::Error> {
     let enums = enumerate_rust_types(rustdoc)?.flat_map(|s| match s {
-        RustType::Struct(_) => None,
-        RustType::Enum(e) => Some(e),
+        RustType::Struct { .. } => None,
+        RustType::Enum { item, .. } => Some(item),
     });
 
     Ok(enums)
@@ -109,16 +109,40 @@ pub fn find_all_struct_and_fq_path(rustdoc: &Value) -> anyhow::Result<HashSet<Fq
 fn enumerate_rust_types(
     rustdoc: &Value,
 ) -> anyhow::Result<impl std::iter::Iterator<Item = RustType> + use<'_>> {
+    let all_fields = parse_all_struct_fields(rustdoc)?
+        .into_iter()
+        .map(|f| (f.id.clone(), f))
+        .collect::<HashMap<_, _>>();
+    let all_variants = parse_all_eunm_variants(rustdoc)?
+        .into_iter()
+        .map(|f| (f.id.clone(), f))
+        .collect::<HashMap<_, _>>();
     let index = rustdoc
         .get("index")
         .context("locate .index")?
         .as_object()
         .context("parse .index as object")?;
-    let rust_types = index.iter().flat_map(|(_, root_item)| {
+    let rust_types = index.iter().flat_map(move |(_, root_item)| {
         parse_struct(root_item)
             .ok()
-            .map(RustType::Struct)
-            .or_else(|| parse_enum(root_item).ok().map(RustType::Enum))
+            .map(|struct_| RustType::Struct {
+                fields: struct_
+                    .field_ids
+                    .iter()
+                    .flat_map(|id| all_fields.get(&id).cloned())
+                    .collect(),
+                item: struct_,
+            })
+            .or_else(|| {
+                parse_enum(root_item).ok().map(|enum_| RustType::Enum {
+                    variants: enum_
+                        .variant_ids
+                        .iter()
+                        .flat_map(|id| all_variants.get(id).cloned())
+                        .collect(),
+                    item: enum_,
+                })
+            })
     });
     Ok(rust_types)
 }
@@ -132,7 +156,22 @@ pub fn parse_all_struct_fields(rustdoc: &Value) -> anyhow::Result<Vec<StructFiel
 
     let structs = index
         .iter()
-        .flat_map(|(_id, root_item)| parse_struct_field(root_item, rustdoc).ok())
+        .flat_map(|(_id, node)| parse_struct_field(node, rustdoc).ok())
+        .collect::<Vec<_>>();
+
+    Ok(structs)
+}
+
+pub fn parse_all_eunm_variants(rustdoc: &Value) -> anyhow::Result<Vec<EnumVariant>> {
+    let index = rustdoc
+        .get("index")
+        .context("locate .index")?
+        .as_object()
+        .context("parse .index as object")?;
+
+    let structs = index
+        .iter()
+        .flat_map(|(_id, node)| parse_enum_variant(node).ok())
         .collect::<Vec<_>>();
 
     Ok(structs)
@@ -150,6 +189,7 @@ fn parse_struct(rustdoc: &Value) -> anyhow::Result<Struct> {
                 .or_else(|| f.as_u64().map(|u| u.to_string()))
         })
         .flatten()
+        .map(Id::from)
         .collect::<Vec<_>>();
     Ok(Struct {
         name: rustdoc.get_str("name")?,
@@ -169,6 +209,7 @@ fn parse_enum(rustdoc: &Value) -> anyhow::Result<Enum> {
                 .or_else(|| f.as_u64().map(|u| u.to_string()))
         })
         .flatten()
+        .map(Id::from)
         .collect::<Vec<_>>();
     Ok(Enum {
         name: rustdoc.get_str("name")?,
@@ -182,7 +223,7 @@ fn parse_struct_field(rustdoc_node: &Value, rustdoc_root: &Value) -> anyhow::Res
         .ok()
         .and_then(|f| serde_json::from_value(f.clone()).ok())
         .context("locate .inner.struct_field")?;
-    let extn_crate_name = match &struct_field {
+    let external_crate_name = match &struct_field {
         StructFieldKind::Primitive(_) => None,
         StructFieldKind::ResolvedPath(r) => rustdoc_root
             .navigate(&["external_crates", &r.id.to_string()])
@@ -191,10 +232,24 @@ fn parse_struct_field(rustdoc_node: &Value, rustdoc_root: &Value) -> anyhow::Res
     };
 
     Ok(StructField {
-        id: rustdoc_node.get_str("id")?,
+        id: rustdoc_node.get_str("id")?.into(),
         name: rustdoc_node.get_str("name")?,
         ty: struct_field,
-        external_crate_name: extn_crate_name,
+        external_crate_name,
+    })
+}
+
+fn parse_enum_variant(rustdoc_node: &Value) -> anyhow::Result<EnumVariant> {
+    let enum_variant_type = rustdoc_node
+        .navigate(&["inner", "variant"])
+        .ok()
+        .and_then(|f| serde_json::from_value(f.clone()).ok())
+        .context("locate .inner.struct_field")?;
+
+    Ok(EnumVariant {
+        id: rustdoc_node.get_str("id")?.into(),
+        name: rustdoc_node.get_str("name")?,
+        ty: enum_variant_type,
     })
 }
 
