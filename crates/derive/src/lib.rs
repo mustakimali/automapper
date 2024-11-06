@@ -153,7 +153,7 @@ impl StructMapping {
             )
             .with_context(|| {
                 format!(
-                    "failed to find source struct {} and resolve fields",
+                    "failed to find source type `{}` and resolve fields",
                     source_type.name_string()
                 )
             })?;
@@ -164,7 +164,7 @@ impl StructMapping {
             )
             .with_context(|| {
                 format!(
-                    "failed to find dest struct {} and resolve fields",
+                    "failed to find destination type `{}` and resolve fields",
                     dest_type.name_string()
                 )
             })?;
@@ -232,7 +232,10 @@ impl StructMapping {
                     self.ctx.clone(),
                     false,
                 )
-                .unwrap(),
+                .with_context(|| {
+                    format!("failed to create field mapping for field `{}`", dest_f.name)
+                })
+                .expect("failed to create field mapping"),
             },
         }
     }

@@ -32,7 +32,7 @@ pub fn find_struct_and_resolve_fields(
             found_struct = Some(s.clone());
             s
         })
-        .map(|s| s.field_ids)
+        .map(|s| s.field_ids.clone())
         .next()
         .map(|field_ids| {
             field_ids
@@ -51,9 +51,29 @@ pub fn find_struct_and_resolve_fields(
 }
 
 pub fn find_all_structs(rustdoc: &Value) -> anyhow::Result<Vec<Struct>> {
-    let structs = enumerate_structs(rustdoc)?;
+    let structs = enumerate_structs(rustdoc)?.into_iter().map(|s| s.clone());
 
     Ok(structs.collect::<Vec<_>>())
+}
+
+fn enumerate_structs(
+    rustdoc: &Value,
+) -> Result<impl Iterator<Item = Struct> + use<'_>, anyhow::Error> {
+    let strcuts = enumerate_rust_types(rustdoc)?.flat_map(|s| match s {
+        RustType::Struct(s) => Some(s),
+        RustType::Enum(_) => None,
+    });
+
+    Ok(strcuts)
+}
+
+fn enumerate_enums(rustdoc: &Value) -> Result<impl Iterator<Item = Enum> + use<'_>, anyhow::Error> {
+    let enums = enumerate_rust_types(rustdoc)?.flat_map(|s| match s {
+        RustType::Struct(_) => None,
+        RustType::Enum(e) => Some(e),
+    });
+
+    Ok(enums)
 }
 
 pub fn find_all_struct_and_fq_path(rustdoc: &Value) -> anyhow::Result<HashSet<FqIdent>> {
@@ -86,18 +106,21 @@ pub fn find_all_struct_and_fq_path(rustdoc: &Value) -> anyhow::Result<HashSet<Fq
     Ok(fq_idents)
 }
 
-fn enumerate_structs(
+fn enumerate_rust_types(
     rustdoc: &Value,
-) -> anyhow::Result<impl std::iter::Iterator<Item = Struct> + use<'_>> {
+) -> anyhow::Result<impl std::iter::Iterator<Item = RustType> + use<'_>> {
     let index = rustdoc
         .get("index")
         .context("locate .index")?
         .as_object()
         .context("parse .index as object")?;
-    let structs = index
-        .iter()
-        .flat_map(|(_, root_item)| parse_struct(root_item).ok());
-    Ok(structs)
+    let rust_types = index.iter().flat_map(|(_, root_item)| {
+        parse_struct(root_item)
+            .ok()
+            .map(RustType::Struct)
+            .or_else(|| parse_enum(root_item).ok().map(RustType::Enum))
+    });
+    Ok(rust_types)
 }
 
 pub fn parse_all_struct_fields(rustdoc: &Value) -> anyhow::Result<Vec<StructField>> {
@@ -131,6 +154,25 @@ fn parse_struct(rustdoc: &Value) -> anyhow::Result<Struct> {
     Ok(Struct {
         name: rustdoc.get_str("name")?,
         field_ids: struct_plain_fields,
+    })
+}
+
+fn parse_enum(rustdoc: &Value) -> anyhow::Result<Enum> {
+    let enum_variant_fields = rustdoc
+        .navigate(&["inner", "enum", "variants"])?
+        .as_array()
+        .context("cast .inner.struct.kind.plain.fields as array")?
+        .iter()
+        .map(|f| {
+            f.as_str()
+                .map(|s| s.to_string())
+                .or_else(|| f.as_u64().map(|u| u.to_string()))
+        })
+        .flatten()
+        .collect::<Vec<_>>();
+    Ok(Enum {
+        name: rustdoc.get_str("name")?,
+        variant_ids: enum_variant_fields,
     })
 }
 
@@ -203,7 +245,7 @@ mod test {
 
         verify_fields_of_struct(&rustdoc, "Test", &["left", "right", "expected", "name"]);
 
-        let rustdoc = get_real_data();
+        let rustdoc = get_test_data();
 
         verify_fields_of_struct(&rustdoc, "Test", &["left", "right", "expected", "name"]);
         verify_fields_of_struct(&rustdoc, "Test2", &["left", "right", "expected", "name"]);
@@ -211,7 +253,7 @@ mod test {
 
     #[test]
     fn test_find_struct_with_nested_field_and_resolve_field() {
-        let rustdoc = get_real_data();
+        let rustdoc = get_test_data();
 
         let (structs, fields) =
             find_struct_and_resolve_fields(&str_to_fq_ident("TestNestedField"), &rustdoc).unwrap();
@@ -272,13 +314,17 @@ mod test {
         assert_eq!(structs.len(), 1662);
     }
 
-    fn get_test_data() -> Value {
-        let json = include_str!("../rustdoc_sample.json");
-        let rustdoc: Value = serde_json::from_str(json).unwrap();
-        rustdoc
+    #[test]
+    fn test_find_all_enums() {
+        let rustdoc = get_test_data();
+
+        let enums = enumerate_enums(&rustdoc).unwrap().collect::<Vec<_>>();
+        assert_eq!(enums.len(), 2);
+        assert_eq!(enums[0].name, "SourceEnum".to_string());
+        assert_eq!(enums[1].name, "DestEnum".to_string());
     }
 
-    fn get_real_data() -> Value {
+    fn get_test_data() -> Value {
         let json = include_str!("../../usage/rustdoc.json");
         let rustdoc: Value = serde_json::from_str(json).unwrap();
         rustdoc

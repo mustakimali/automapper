@@ -11,10 +11,38 @@ mod ctx;
 mod fq_ident;
 mod path_dict;
 
+pub enum RustType {
+    Struct(Struct),
+    Enum(Enum),
+}
+
+impl RustType {
+    pub fn name(&self) -> &str {
+        match self {
+            RustType::Struct(s) => &s.name,
+            RustType::Enum(e) => &e.name,
+        }
+    }
+
+    pub fn is_struct(&self) -> bool {
+        matches!(self, RustType::Struct(_))
+    }
+
+    pub fn is_enum(&self) -> bool {
+        matches!(self, RustType::Enum(_))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Struct {
     pub name: String,
     pub field_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Enum {
+    pub name: String,
+    pub variant_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

@@ -138,5 +138,37 @@ fn mapping_casts_primitive_types() {
         fn source_to_dest(SourceInnerType, SourceInnerTypeWthDifferentInnerTypeCanBeCasted);
     };
     let result = source_to_dest(input.clone());
+
     assert_eq!(result.inner_field, input.inner_field as _);
+}
+
+#[derive(Clone)]
+struct SourceStructWithEnumField {
+    enum_field: SourceEnum,
+}
+#[derive(Clone)]
+struct DestStructWithEnumField {
+    enum_field: DestEnum,
+}
+#[derive(Clone)]
+enum SourceEnum {
+    Variant1,
+    Variant2,
+}
+#[derive(Clone)]
+enum DestEnum {
+    Variant1,
+    Variant2,
+}
+
+#[test]
+fn basic_enum_mapping() {
+    let input = SourceStructWithEnumField {
+        enum_field: SourceEnum::Variant1,
+    };
+    lazy_map! {
+        fn source_to_dest(SourceStructWithEnumField, DestStructWithEnumField);
+    };
+    let result = source_to_dest(input.clone());
+    assert_eq!(result.enum_field, DestEnum::Variant1);
 }
