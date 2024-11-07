@@ -3,7 +3,7 @@ use std::{hash::Hash, path::Display};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
-pub use cache::{PathCache, TypeCache};
+pub use cache::{Cache, PathCache};
 pub use ctx::{MacroContextInner, MacroCtx};
 pub use fq_ident::FqIdent;
 

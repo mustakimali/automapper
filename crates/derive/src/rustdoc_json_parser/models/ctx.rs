@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use serde_json::Value;
 
-use super::cache::TypeCache;
+use super::cache::Cache;
 use super::PathCache;
 
 #[derive(Clone, Debug)]
@@ -24,9 +24,7 @@ impl MacroCtx {
 
 #[derive(Debug)]
 pub struct MacroContextInner {
-    pub rustdoc_json: Value,
-    pub path_cache: PathCache,
-    pub type_cache: TypeCache,
+    pub cache: Cache,
 }
 
 impl Deref for MacroCtx {

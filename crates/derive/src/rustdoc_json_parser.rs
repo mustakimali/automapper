@@ -76,14 +76,14 @@ fn enumerate_enums(rustdoc: &Value) -> Result<impl Iterator<Item = Enum> + use<'
     Ok(enums)
 }
 
-pub fn find_all_struct_and_fq_path(rustdoc: &Value) -> anyhow::Result<HashSet<FqIdent>> {
+pub fn find_all_rusttype_fq_path(rustdoc: &Value) -> anyhow::Result<HashSet<FqIdent>> {
     let mut fq_idents = HashSet::new();
-    let index = rustdoc
+    let paths = rustdoc
         .get("paths")
         .context("locate .paths")?
         .as_object()
         .context("parse .paths as object")?;
-    for (_, root_item) in index.iter() {
+    for (_, root_item) in paths.iter() {
         let Some(kind) = root_item.get_str("kind").ok() else {
             continue;
         };
@@ -369,7 +369,7 @@ mod test {
     fn test_find_all_struct_and_fq_path() {
         let rustdoc = get_test_data();
 
-        let structs = find_all_struct_and_fq_path(&rustdoc).unwrap();
+        let structs = find_all_rusttype_fq_path(&rustdoc).unwrap();
         assert_eq!(structs.len(), 1662);
     }
 
@@ -396,7 +396,7 @@ mod test {
     fn test_type_cache() {
         let rustdoc = get_test_data();
         let types = enumerate_rust_types(&rustdoc).unwrap().collect();
-        let type_cache = TypeCache::new(types);
+        let type_cache = Cache::new(types);
         let rust_type = type_cache
             .find(&FqIdent::try_from_str("usage::Test").unwrap())
             .unwrap();

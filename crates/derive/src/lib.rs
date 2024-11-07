@@ -7,7 +7,7 @@ use crate::rustdoc_json_parser::models::{MacroContextInner, MacroCtx, Struct, St
 use anyhow::Context;
 use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
-use rustdoc_json_parser::models::{FqIdent, PathCache, TypeCache};
+use rustdoc_json_parser::models::{Cache, FqIdent, PathCache};
 use serde_json::Value;
 use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
@@ -79,23 +79,8 @@ impl ToTokens for TraitImpl {
             return;
         };
 
-        let rustdoc_json: Value = serde_json::from_str(
-            &std::fs::read_to_string(&rustdoc_path).expect("failed to read rustdoc.json"),
-        )
-        .expect("failed to parse rustdoc.json");
-
-        let path_cache = rustdoc_json_parser::find_all_struct_and_fq_path(&rustdoc_json)
-            .expect("failed to find all struct and fq path")
-            .into_iter()
-            .collect::<Vec<_>>();
-        let items_cache = rustdoc_json_parser::enumerate_rust_types(&rustdoc_json)
-            .expect("failed to enumerate rust types")
-            .collect::<Vec<_>>();
-        let ctx = MacroCtx::new(MacroContextInner {
-            rustdoc_json,
-            path_cache: PathCache::new(path_cache),
-            type_cache: TypeCache::new(items_cache),
-        });
+        let cache = Cache::new_from_rust_doc(rustdoc_path).unwrap();
+        let ctx = MacroCtx::new(MacroContextInner { cache });
 
         let root = StructMapping::new(
             vec![format_ident!("value")],
@@ -153,7 +138,7 @@ impl StructMapping {
         let (source_struct, source_fields) =
             rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(
                 &source_type,
-                &ctx.rustdoc_json,
+                &ctx.cache.rustdoc_json,
             )
             .with_context(|| {
                 format!(
@@ -164,7 +149,7 @@ impl StructMapping {
         let (dest_struct, dest_fields) =
             rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(
                 &dest_type,
-                &ctx.rustdoc_json,
+                &ctx.cache.rustdoc_json,
             )
             .with_context(|| {
                 format!(
@@ -284,7 +269,8 @@ impl ToTokens for StructMapping {
 
         let dest_ty_path = self
             .ctx
-            .path_cache
+            .cache
+            .paths
             .find(self.dest_type.name())
             .map(|f| f.crate_scoped())
             .expect("find fully qualified path");
