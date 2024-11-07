@@ -7,7 +7,7 @@ pub struct FqIdent {
 }
 
 impl FqIdent {
-    pub fn try_from(name: &str) -> anyhow::Result<Self> {
+    pub fn try_from_str(name: &str) -> anyhow::Result<Self> {
         let path = name
             .split("::")
             .map(|s| format_ident!("{}", s))

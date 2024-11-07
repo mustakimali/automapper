@@ -1,8 +1,23 @@
-use super::FqIdent;
+use super::{FqIdent, RustType};
 
 #[derive(Debug)]
 pub struct PathCache {
     path: Vec<FqIdent>,
+}
+
+#[derive(Debug)]
+pub struct TypeCache {
+    path: Vec<RustType>,
+}
+
+impl TypeCache {
+    pub fn new(types: Vec<RustType>) -> Self {
+        Self { path: types }
+    }
+
+    pub fn find(&self, ident: &FqIdent) -> Option<&RustType> {
+        self.path.iter().find(|i| i.name() == ident.to_string())
+    }
 }
 
 impl PathCache {

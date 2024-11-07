@@ -7,7 +7,7 @@ use crate::rustdoc_json_parser::models::{MacroContextInner, MacroCtx, Struct, St
 use anyhow::Context;
 use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
-use rustdoc_json_parser::models::{FqIdent, PathCache};
+use rustdoc_json_parser::models::{FqIdent, PathCache, TypeCache};
 use serde_json::Value;
 use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
@@ -88,9 +88,13 @@ impl ToTokens for TraitImpl {
             .expect("failed to find all struct and fq path")
             .into_iter()
             .collect::<Vec<_>>();
+        let items_cache = rustdoc_json_parser::enumerate_rust_types(&rustdoc_json)
+            .expect("failed to enumerate rust types")
+            .collect::<Vec<_>>();
         let ctx = MacroCtx::new(MacroContextInner {
             rustdoc_json,
             path_cache: PathCache::new(path_cache),
+            type_cache: TypeCache::new(items_cache),
         });
 
         let root = StructMapping::new(

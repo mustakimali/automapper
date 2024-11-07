@@ -3,13 +3,13 @@ use std::{hash::Hash, path::Display};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
+pub use cache::{PathCache, TypeCache};
 pub use ctx::{MacroContextInner, MacroCtx};
 pub use fq_ident::FqIdent;
-pub use path_dict::PathCache;
 
+mod cache;
 mod ctx;
 mod fq_ident;
-mod path_dict;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Id(String);
@@ -20,6 +20,7 @@ impl From<String> for Id {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RustType {
     Struct {
         item: Struct,
@@ -48,19 +49,19 @@ impl RustType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Struct {
     pub name: String,
     pub field_ids: Vec<Id>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Enum {
     pub name: String,
     pub variant_ids: Vec<Id>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructField {
     pub id: Id,
     pub name: String,
@@ -68,7 +69,7 @@ pub struct StructField {
     pub external_crate_name: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnumVariant {
     pub id: Id,
     pub name: String,
@@ -87,9 +88,9 @@ impl Hash for StructField {
 }
 
 #[derive(Debug, serde::Deserialize, Clone, PartialEq, Eq, Hash)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", tag = "kind")]
 pub enum EnumVariantKind {
-    Plain,
+    Plain { discriminant: Option<String> },
 }
 
 impl StructField {
@@ -133,7 +134,7 @@ impl ResolvedPathExt for ResolvedPathStructField {
 impl ResolvedPathExt for StructFieldKind {
     fn name_ident(&self) -> FqIdent {
         match self {
-            StructFieldKind::Primitive(n) => FqIdent::try_from(&n).expect("n"),
+            StructFieldKind::Primitive(n) => FqIdent::try_from_str(&n).expect("n"),
             StructFieldKind::ResolvedPath(path) => path.name_ident(),
         }
     }
