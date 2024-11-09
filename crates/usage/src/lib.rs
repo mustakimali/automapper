@@ -117,19 +117,19 @@ fn mapping_nested_similar_types() {
     assert_eq!(result.field.inner_field, input.field.inner_field);
 }
 
-// #[test]
-// fn mapping_nested_similar_types_on_nested_mod() {
-//     use nested::{nested_inner::NestedSourceInnerType, NestedDestType, NestedSourceType};
-//     let input = NestedSourceType {
-//         field: NestedSourceInnerType { inner_field: 1 },
-//     };
+#[test]
+fn mapping_nested_similar_types_on_nested_mod() {
+    use nested::{nested_inner::NestedSourceInnerType, NestedDestType, NestedSourceType};
+    let input = NestedSourceType {
+        field: NestedSourceInnerType { inner_field: 1 },
+    };
 
-//     lazy_map! {
-//         fn source_to_dest(nested::NestedSourceType, nested::NestedDestType);
-//     };
-//     let result = source_to_dest(input.clone());
-//     assert_eq!(result.field.inner_field, input.field.inner_field);
-// }
+    lazy_map! {
+        fn source_to_dest(nested::NestedSourceType, nested::NestedDestType);
+    };
+    let result = source_to_dest(input.clone());
+    assert_eq!(result.field.inner_field, input.field.inner_field);
+}
 
 #[test]
 fn mapping_casts_primitive_types() {
