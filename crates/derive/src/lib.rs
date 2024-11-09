@@ -223,11 +223,62 @@ impl StructMapping {
             },
         }
     }
+
+    fn map_struct(&self, dest_fields: &Vec<StructField>, tokens: &mut proc_macro2::TokenStream) {
+        let RustType::Struct {
+            item: _,
+            fields: source_fields,
+        } = &self.source
+        else {
+            panic!("source type is not a struct");
+        };
+
+        let assignments = dest_fields
+            .iter()
+            .map(|dest_f| {
+                let Some(source_f) = source_fields
+                    .iter()
+                    .find(|source_f| source_f.name == dest_f.name)
+                else {
+                    panic!("field {} not found in source struct", dest_f.name);
+                };
+
+                if dest_f.ty == source_f.ty {
+                    self.mapping_field_same_type(dest_f)
+                } else if dest_f.is_primitive() && source_f.is_primitive() {
+                    self.mapping_field_with_cast(dest_f)
+                } else {
+                    self.mapping_field_struct(source_f, dest_f)
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let dest_ty_path = self
+            .ctx
+            .cache
+            .paths
+            .find(self.dest_type.name())
+            .map(|f| f.crate_scoped())
+            .expect("find fully qualified path");
+
+        let struct_and_fields_mapping = quote! {
+            #dest_ty_path {
+                #(#assignments)*
+            }
+        };
+        if self.is_root {
+            let o = struct_and_fields_mapping.to_string();
+            dbg!(o);
+        }
+
+        tokens.extend(struct_and_fields_mapping);
+    }
 }
 
 impl ToTokens for StructMapping {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         if !self.source.same_kind(&self.destination) {
+            //TODO(scenerio): destnation struct has only one enum field of same kind
             panic!(
                 "Source and destination types are not the same kind. Can't assign {} into {}",
                 self.source.kind(),
@@ -235,61 +286,40 @@ impl ToTokens for StructMapping {
             );
         }
 
-        dbg!(&self);
-
         match &self.destination {
             RustType::Struct { item: _, fields } => {
-                let RustType::Struct {
-                    item: _,
-                    fields: source_fields,
-                } = &self.source
-                else {
-                    panic!("source type is not a struct");
-                };
+                self.map_struct(fields, tokens);
+            }
+            RustType::Enum { item, variants } => {
+                let source_ty_path = self
+                    .ctx
+                    .cache
+                    .paths
+                    .find(self.source_type.name())
+                    .map(|f| f.crate_scoped())
+                    .expect("find fully qualified path");
+                let enum_field_path = self.source_field_name.clone();
 
-                let assignments = fields
+                let variants = variants
                     .iter()
-                    .map(|dest_f| {
-                        let Some(source_f) = source_fields
-                            .iter()
-                            .find(|source_f| source_f.name == dest_f.name)
-                        else {
-                            panic!("field {} not found in source struct", dest_f.name);
-                        };
-
-                        if dest_f.ty == source_f.ty {
-                            self.mapping_field_same_type(dest_f)
-                        } else if dest_f.is_primitive() && source_f.is_primitive() {
-                            self.mapping_field_with_cast(dest_f)
-                        } else {
-                            self.mapping_field_struct(source_f, dest_f)
+                    .map(|v| {
+                        let variant_name = format_ident!("{}", v.name);
+                        quote! {
+                            #source_ty_path::#variant_name => todo!(),
                         }
                     })
                     .collect::<Vec<_>>();
 
-                let dest_ty_path = self
-                    .ctx
-                    .cache
-                    .paths
-                    .find(self.dest_type.name())
-                    .map(|f| f.crate_scoped())
-                    .expect("find fully qualified path");
-                let struct_and_fields_mapping = quote! {
-                    #dest_ty_path {
-                        #(#assignments)*
+                let enum_f = quote! {
+                    match #(#enum_field_path).* {
+                        #(#variants)*
                     }
                 };
-                if self.is_root {
-                    let o = struct_and_fields_mapping.to_string();
-                    dbg!(o);
-                }
+                let o = enum_f.to_string();
+                dbg!(o);
 
-                tokens.extend(struct_and_fields_mapping);
+                tokens.extend(enum_f);
             }
-            RustType::Enum {
-                item: _,
-                variants: _,
-            } => unimplemented!("enum mapping"),
         }
     }
 }

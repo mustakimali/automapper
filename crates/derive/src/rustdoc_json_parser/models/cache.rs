@@ -1,26 +1,19 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
-use derivative::Derivative;
 use serde_json::Value;
 
 use crate::rustdoc_json_parser;
 
 use super::{FqIdent, RustType};
 
-#[derive(Debug)]
 pub struct PathCache {
     path: Vec<FqIdent>,
 }
 
-#[derive(Derivative)]
-#[derivative(Debug)]
 pub struct Cache {
-    #[derivative(Debug = "ignore")]
     types: Vec<RustType>,
-    #[derivative(Debug = "ignore")]
     pub paths: PathCache,
-    #[derivative(Debug = "ignore")]
     pub rustdoc_json: Value,
 }
 

@@ -2,6 +2,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use derivative::Derivative;
 use serde_json::Value;
 
 use super::cache::Cache;
@@ -22,8 +23,10 @@ impl MacroCtx {
     }
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct MacroContextInner {
+    #[derivative(Debug = "ignore")]
     pub cache: Cache,
 }
 

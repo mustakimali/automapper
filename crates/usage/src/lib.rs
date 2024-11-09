@@ -5,7 +5,7 @@ use lazy_to_map_derive::lazy_map;
 use nested::nested_inner::NestedDestInnerType;
 use std::path::PathBuf;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 struct Test {
     left: u64,
     right: u64,
@@ -37,49 +37,49 @@ struct TestNestedFieldTo {
 
 // --
 //
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 struct DestType {
     field: DestInnerType,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 struct DestInnerType {
     inner_field: u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 struct SourceType {
     field: SourceInnerType,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 struct SourceInnerType {
     inner_field: u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 struct SourceInnerTypeWthDifferentInnerTypeCanBeCasted {
     inner_field: i32,
 }
 
 mod nested {
-    #[derive(Clone)]
+    #[derive(Clone, Debug, PartialEq)]
     pub struct NestedDestType {
         pub field: nested_inner::NestedDestInnerType,
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug, PartialEq)]
     pub struct NestedSourceType {
         pub field: nested_inner::NestedSourceInnerType,
     }
 
     pub mod nested_inner {
-        #[derive(Clone)]
+        #[derive(Clone, Debug, PartialEq)]
         pub struct NestedDestInnerType {
             pub inner_field: u64,
         }
 
-        #[derive(Clone)]
+        #[derive(Clone, Debug, PartialEq)]
         pub struct NestedSourceInnerType {
             pub inner_field: u64,
         }
@@ -142,20 +142,20 @@ fn mapping_casts_primitive_types() {
     assert_eq!(result.inner_field, input.inner_field as _);
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 struct SourceStructWithEnumField {
     enum_field: SourceEnum,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 struct DestStructWithEnumField {
     enum_field: DestEnum,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 enum SourceEnum {
     Variant1,
     Variant2,
 }
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 enum DestEnum {
     Variant1,
     Variant2,
