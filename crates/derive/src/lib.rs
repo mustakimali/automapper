@@ -290,7 +290,18 @@ impl ToTokens for StructMapping {
             RustType::Struct { item: _, fields } => {
                 self.map_struct(fields, tokens);
             }
-            RustType::Enum { item, variants } => {
+            RustType::Enum {
+                item,
+                variants: dest_variants,
+            } => {
+                let RustType::Enum {
+                    item: _,
+                    variants: source_variants,
+                } = &self.source
+                else {
+                    panic!("source type is not a struct");
+                };
+
                 let source_ty_path = self
                     .ctx
                     .cache
@@ -298,21 +309,40 @@ impl ToTokens for StructMapping {
                     .find(self.source_type.name())
                     .map(|f| f.crate_scoped())
                     .expect("find fully qualified path");
-                let enum_field_path = self.source_field_name.clone();
+                let dest_ty_path = self
+                    .ctx
+                    .cache
+                    .paths
+                    .find(self.dest_type.name())
+                    .map(|f| f.crate_scoped())
+                    .expect("find fully qualified path");
 
-                let variants = variants
+                let mapped_variant = dest_variants
                     .iter()
                     .map(|v| {
+                        let source_variant = source_variants
+                            .iter()
+                            .find(|sv| sv.name == v.name)
+                            .with_context(|| {
+                                format!(
+                                    "Source Enum {} does not have a variant named {}",
+                                    source_ty_path, v.name
+                                )
+                            })
+                            .expect("find variants matching same name");
+
                         let variant_name = format_ident!("{}", v.name);
+                        let source_variant_name = format_ident!("{}", source_variant.name);
                         quote! {
-                            #source_ty_path::#variant_name => todo!(),
+                            #source_ty_path::#variant_name => #dest_ty_path::#source_variant_name,
                         }
                     })
                     .collect::<Vec<_>>();
 
+                let enum_field_path = self.source_field_name.clone();
                 let enum_f = quote! {
                     match #(#enum_field_path).* {
-                        #(#variants)*
+                        #(#mapped_variant)*
                     }
                 };
                 let o = enum_f.to_string();
