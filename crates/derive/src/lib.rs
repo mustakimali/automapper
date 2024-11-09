@@ -7,7 +7,7 @@ use crate::rustdoc_json_parser::models::{MacroContextInner, MacroCtx, Struct, St
 use anyhow::Context;
 use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
-use rustdoc_json_parser::models::{Cache, FqIdent, PathCache};
+use rustdoc_json_parser::models::{Cache, FqIdent, PathCache, RustType};
 use serde_json::Value;
 use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
@@ -109,20 +109,19 @@ impl ToTokens for TraitImpl {
 }
 
 /// Generates mapping of a struct
-/// ```no_run
+/// ```ignore
 /// MyType {
 ///     field1: value.field1,
 ///     field2: value.field2,
 /// }
 /// ```
+#[derive(Debug)]
 struct StructMapping {
     source_field_name: Vec<syn::Ident>,
     source_type: FqIdent,
     dest_type: FqIdent,
-    source_struct: Struct,
-    source_fields: Vec<StructField>,
-    dest_struct: Struct,
-    dest_fields: Vec<StructField>,
+    source: RustType,
+    destination: RustType,
     ctx: MacroCtx,
     is_root: bool,
 }
@@ -135,37 +134,33 @@ impl StructMapping {
         ctx: MacroCtx,
         is_root: bool,
     ) -> anyhow::Result<Self> {
-        let (source_struct, source_fields) =
-            rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(
-                &source_type,
-                &ctx.cache.rustdoc_json,
-            )
+        let source = ctx
+            .cache
+            .find(&source_type)
             .with_context(|| {
                 format!(
                     "failed to find source type `{}` and resolve fields",
                     source_type.name_string()
                 )
-            })?;
-        let (dest_struct, dest_fields) =
-            rustdoc_json_parser::find_struct_and_resolve_fields_for_ident(
-                &dest_type,
-                &ctx.cache.rustdoc_json,
-            )
+            })?
+            .clone();
+        let destination = ctx
+            .cache
+            .find(&dest_type)
             .with_context(|| {
                 format!(
                     "failed to find destination type `{}` and resolve fields",
-                    dest_type.name_string()
+                    source_type.name_string()
                 )
-            })?;
+            })?
+            .clone();
 
         Ok(Self {
             source_field_name,
             source_type,
             dest_type,
-            source_struct,
-            source_fields,
-            dest_struct,
-            dest_fields,
+            source,
+            destination,
             ctx,
             is_root,
         })
@@ -232,59 +227,70 @@ impl StructMapping {
 
 impl ToTokens for StructMapping {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let assignments = self
-            .dest_fields
-            .iter()
-            .map(|dest_f| {
-                let Some(source_f) = self
-                    .source_fields
-                    .iter()
-                    .find(|source_f| source_f.name == dest_f.name)
-                else {
-                    panic!("field {} not found in source struct", dest_f.name);
-                };
-
-                // let dbg_f = format!(
-                //     "Mapping: {}.{}[{}] -> {}[{}]",
-                //     self.dbg_variable_name(),
-                //     source_f.name,
-                //     source_f.type_name(),
-                //     dest_f.name,
-                //     dest_f.type_name()
-                // );
-                // dbg!(dbg_f);
-                //
-                //dbg!(&source_f, &dest_f);
-
-                // TODO: custom mapping
-                if dest_f.ty == source_f.ty {
-                    self.mapping_field_same_type(dest_f)
-                } else if dest_f.is_primitive() && source_f.is_primitive() {
-                    self.mapping_field_with_cast(dest_f)
-                } else {
-                    self.mapping_field_struct(source_f, dest_f)
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let dest_ty_path = self
-            .ctx
-            .cache
-            .paths
-            .find(self.dest_type.name())
-            .map(|f| f.crate_scoped())
-            .expect("find fully qualified path");
-        let struct_and_fields_mapping = quote! {
-            #dest_ty_path {
-                #(#assignments)*
-            }
-        };
-        if self.is_root {
-            let o = struct_and_fields_mapping.to_string();
-            dbg!(o);
+        if !self.source.same_kind(&self.destination) {
+            panic!(
+                "Source and destination types are not the same kind. Can't assign {} into {}",
+                self.source.kind(),
+                self.destination.kind()
+            );
         }
 
-        tokens.extend(struct_and_fields_mapping);
+        dbg!(&self);
+
+        match &self.destination {
+            RustType::Struct { item: _, fields } => {
+                let RustType::Struct {
+                    item: _,
+                    fields: source_fields,
+                } = &self.source
+                else {
+                    panic!("source type is not a struct");
+                };
+
+                let assignments = fields
+                    .iter()
+                    .map(|dest_f| {
+                        let Some(source_f) = source_fields
+                            .iter()
+                            .find(|source_f| source_f.name == dest_f.name)
+                        else {
+                            panic!("field {} not found in source struct", dest_f.name);
+                        };
+
+                        if dest_f.ty == source_f.ty {
+                            self.mapping_field_same_type(dest_f)
+                        } else if dest_f.is_primitive() && source_f.is_primitive() {
+                            self.mapping_field_with_cast(dest_f)
+                        } else {
+                            self.mapping_field_struct(source_f, dest_f)
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                let dest_ty_path = self
+                    .ctx
+                    .cache
+                    .paths
+                    .find(self.dest_type.name())
+                    .map(|f| f.crate_scoped())
+                    .expect("find fully qualified path");
+                let struct_and_fields_mapping = quote! {
+                    #dest_ty_path {
+                        #(#assignments)*
+                    }
+                };
+                if self.is_root {
+                    let o = struct_and_fields_mapping.to_string();
+                    dbg!(o);
+                }
+
+                tokens.extend(struct_and_fields_mapping);
+            }
+            RustType::Enum {
+                item: _,
+                variants: _,
+            } => unimplemented!("enum mapping"),
+        }
     }
 }
 

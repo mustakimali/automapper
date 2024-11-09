@@ -47,6 +47,21 @@ impl RustType {
     pub fn is_enum(&self) -> bool {
         matches!(self, RustType::Enum { .. })
     }
+
+    pub fn same_kind(&self, other: &Self) -> bool {
+        match (self, other) {
+            (RustType::Struct { .. }, RustType::Struct { .. }) => true,
+            (RustType::Enum { .. }, RustType::Enum { .. }) => true,
+            _ => false,
+        }
+    }
+
+    pub fn kind(&self) -> &str {
+        match self {
+            RustType::Struct { .. } => "struct",
+            RustType::Enum { .. } => "enum",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

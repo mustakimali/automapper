@@ -18,3 +18,4 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 rustdoc-json = { workspace = true }
 walkdir = { workspace = true }
+derivative = "2.2.0"

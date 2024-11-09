@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
+use derivative::Derivative;
 use serde_json::Value;
 
 use crate::rustdoc_json_parser;
@@ -12,10 +13,14 @@ pub struct PathCache {
     path: Vec<FqIdent>,
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Cache {
+    #[derivative(Debug = "ignore")]
     types: Vec<RustType>,
+    #[derivative(Debug = "ignore")]
     pub paths: PathCache,
+    #[derivative(Debug = "ignore")]
     pub rustdoc_json: Value,
 }
 
@@ -26,6 +31,10 @@ impl Cache {
         )
         .context("failed to parse rustdoc.json")?;
 
+        Self::new_from_rust_doc_json(rustdoc_json)
+    }
+
+    pub fn new_from_rust_doc_json(rustdoc_json: Value) -> anyhow::Result<Self> {
         let path_cache = rustdoc_json_parser::find_all_rusttype_fq_path(&rustdoc_json)
             .context("failed to find all struct and fq path")?
             .into_iter()
@@ -44,7 +53,9 @@ impl Cache {
     }
 
     pub fn find(&self, ident: &FqIdent) -> Option<&RustType> {
-        self.types.iter().find(|i| i.name() == ident.to_string())
+        self.types
+            .iter()
+            .find(|i| i.name() == ident.to_string() || i.name().ends_with(&ident.to_string()))
     }
 }
 
