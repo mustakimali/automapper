@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::Context;
 use serde_json::Value;
 
-use crate::rustdoc_json_parser;
+use crate::rdoc_parser;
 
 use super::{FqIdent, RustType};
 
@@ -28,14 +28,14 @@ impl Cache {
     }
 
     pub fn new_from_rust_doc_json(rustdoc_json: Value) -> anyhow::Result<Self> {
-        let path_cache = rustdoc_json_parser::find_all_rusttype_fq_path(&rustdoc_json)
+        let path_cache = rdoc_parser::find_all_rusttype_fq_path(&rustdoc_json)
             .context("failed to find all struct and fq path")?
             .into_iter()
             .collect::<Vec<_>>();
 
         let paths = PathCache::new(path_cache);
 
-        let types = rustdoc_json_parser::enumerate_rust_types(&rustdoc_json, &paths)
+        let types = rdoc_parser::enumerate_rust_types(&rustdoc_json, &paths)
             .context("failed to enumerate rust types")?
             .collect::<Vec<_>>();
 
@@ -103,7 +103,7 @@ mod test {
 
     #[test]
     fn find_nested_fields() {
-        let rustdoc = rustdoc_json_parser::test::get_test_data();
+        let rustdoc = rdoc_parser::test::get_test_data();
         let cache = Cache::new_from_rust_doc_json(rustdoc).unwrap();
 
         let found = cache

@@ -3,11 +3,11 @@
 
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use crate::rustdoc_json_parser::models::{MacroContextInner, MacroCtx, Struct, StructField};
+use crate::rdoc_parser::models::{MacroContextInner, MacroCtx, Struct, StructField};
 use anyhow::Context;
 use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
-use rustdoc_json_parser::models::{Cache, FqIdent, PathCache, RustType};
+use rdoc_parser::models::{Cache, FqIdent, PathCache, RustType};
 use serde_json::Value;
 use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
@@ -15,7 +15,7 @@ use syn::{
 };
 use walkdir::WalkDir;
 
-mod rustdoc_json_parser;
+mod rdoc_parser;
 
 struct TraitImpl {
     struct_token: Token![fn],
