@@ -24,10 +24,12 @@ impl From<String> for Id {
 pub enum RustType {
     Struct {
         item: Struct,
+        fq_path: Option<FqIdent>,
         fields: Vec<StructField>,
     },
     Enum {
         item: Enum,
+        fq_path: Option<FqIdent>,
         variants: Vec<EnumVariant>,
     },
 }
@@ -38,6 +40,19 @@ impl RustType {
             RustType::Struct { item, .. } => &item.name,
             RustType::Enum { item, .. } => &item.name,
         }
+    }
+    pub fn fully_qualified_path(&self) -> &Option<FqIdent> {
+        match self {
+            RustType::Struct { fq_path, .. } => fq_path,
+            RustType::Enum { fq_path, .. } => fq_path,
+        }
+    }
+
+    pub fn equals_fq_path(&self, ident: &FqIdent) -> bool {
+        self.fully_qualified_path()
+            .as_ref()
+            .map(|p| p == ident)
+            .unwrap_or_default()
     }
 
     pub fn is_struct(&self) -> bool {

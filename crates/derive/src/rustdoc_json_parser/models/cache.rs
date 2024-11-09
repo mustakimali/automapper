@@ -12,7 +12,7 @@ pub struct PathCache {
 }
 
 pub struct Cache {
-    types: Vec<RustType>,
+    pub types: Vec<RustType>,
     pub paths: PathCache,
     pub rustdoc_json: Value,
 }
@@ -33,10 +33,11 @@ impl Cache {
             .into_iter()
             .collect::<Vec<_>>();
 
-        let types = rustdoc_json_parser::enumerate_rust_types(&rustdoc_json)
+        let paths = PathCache::new(path_cache);
+
+        let types = rustdoc_json_parser::enumerate_rust_types(&rustdoc_json, &paths)
             .context("failed to enumerate rust types")?
             .collect::<Vec<_>>();
-        let paths = PathCache::new(path_cache);
 
         Ok(Self {
             types,
@@ -46,9 +47,13 @@ impl Cache {
     }
 
     pub fn find(&self, ident: &FqIdent) -> Option<&RustType> {
-        self.types
-            .iter()
-            .find(|i| i.name() == ident.to_string() || i.name().ends_with(&ident.to_string()))
+        let fq_path = self.paths.find(ident.name()).map(|f| f.crate_scoped());
+
+        self.types.iter().find(|ty| match &fq_path {
+            Some(fq) => ty.equals_fq_path(fq),
+            //None => ty.name().ends_with(&ident.name_string()),
+            None => unimplemented!(),
+        })
     }
 }
 
@@ -72,6 +77,10 @@ impl PathCache {
 
         self.find(&seg)
     }
+
+    pub fn find_fully_qualified_path(&self, ident: &FqIdent) -> Option<FqIdent> {
+        self.find(ident.name()).map(|f| f.crate_scoped())
+    }
 }
 
 #[cfg(test)]
@@ -90,5 +99,15 @@ mod test {
 
         assert!(cache.find(&[format_ident!("Path")]).is_some());
         //assert!(cache.find_by_path(syn::Path::parse).is_some()) // todo: test
+    }
+
+    #[test]
+    fn find_nested_fields() {
+        let rustdoc = rustdoc_json_parser::test::get_test_data();
+        let cache = Cache::new_from_rust_doc_json(rustdoc).unwrap();
+
+        let found = cache
+            .find(&FqIdent::try_from_str("nested_inner::NestedSourceInnerType").unwrap())
+            .expect("find nested type");
     }
 }

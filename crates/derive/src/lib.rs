@@ -228,6 +228,7 @@ impl StructMapping {
         let RustType::Struct {
             item: _,
             fields: source_fields,
+            ..
         } = &self.source
         else {
             panic!("source type is not a struct");
@@ -287,16 +288,20 @@ impl ToTokens for StructMapping {
         }
 
         match &self.destination {
-            RustType::Struct { item: _, fields } => {
+            RustType::Struct {
+                item: _, fields, ..
+            } => {
                 self.map_struct(fields, tokens);
             }
             RustType::Enum {
                 item,
                 variants: dest_variants,
+                ..
             } => {
                 let RustType::Enum {
                     item: _,
                     variants: source_variants,
+                    ..
                 } = &self.source
                 else {
                     panic!("source type is not a struct");
@@ -306,15 +311,13 @@ impl ToTokens for StructMapping {
                     .ctx
                     .cache
                     .paths
-                    .find(self.source_type.name())
-                    .map(|f| f.crate_scoped())
+                    .find_fully_qualified_path(&self.source_type)
                     .expect("find fully qualified path");
                 let dest_ty_path = self
                     .ctx
                     .cache
                     .paths
-                    .find(self.dest_type.name())
-                    .map(|f| f.crate_scoped())
+                    .find_fully_qualified_path(&self.dest_type)
                     .expect("find fully qualified path");
 
                 let mapped_variant = dest_variants

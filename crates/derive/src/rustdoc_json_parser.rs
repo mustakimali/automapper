@@ -8,74 +8,6 @@ use thiserror::__private::AsDisplay;
 
 pub mod models;
 
-pub fn find_struct_and_resolve_fields_for_ident(
-    fq_ident: &FqIdent,
-    rustdoc: &Value,
-) -> anyhow::Result<(Struct, Vec<StructField>)> {
-    find_struct_and_resolve_fields(fq_ident, rustdoc)
-}
-
-pub fn find_struct_and_resolve_fields(
-    fq_ident: &FqIdent,
-    rustdoc: &Value,
-) -> anyhow::Result<(Struct, Vec<StructField>)> {
-    let all_fields = parse_all_struct_fields(rustdoc)?
-        .into_iter()
-        .map(|f| (f.id.clone(), f))
-        .collect::<HashMap<_, _>>();
-
-    let mut found_struct: Option<Struct> = None;
-
-    let fields = enumerate_structs(rustdoc)?
-        .filter(|s| s.name_ident().maybe_eq(fq_ident))
-        .map(|s| {
-            found_struct = Some(s.clone());
-            s
-        })
-        .map(|s| s.field_ids.clone())
-        .next()
-        .map(|field_ids| {
-            field_ids
-                .into_iter()
-                .flat_map(|id| all_fields.get(&id).cloned())
-                .collect::<Vec<_>>()
-        })
-        .with_context(|| {
-            format!(
-                "error finding fields for struct `{}`",
-                fq_ident.name_string()
-            )
-        })?;
-
-    found_struct.map(|s| (s, fields)).context("locate struct")
-}
-
-pub fn find_all_structs(rustdoc: &Value) -> anyhow::Result<Vec<Struct>> {
-    let structs = enumerate_structs(rustdoc)?.into_iter().map(|s| s.clone());
-
-    Ok(structs.collect::<Vec<_>>())
-}
-
-fn enumerate_structs(
-    rustdoc: &Value,
-) -> Result<impl Iterator<Item = Struct> + use<'_>, anyhow::Error> {
-    let strcuts = enumerate_rust_types(rustdoc)?.flat_map(|s| match s {
-        RustType::Struct { item, .. } => Some(item),
-        RustType::Enum { .. } => None,
-    });
-
-    Ok(strcuts)
-}
-
-fn enumerate_enums(rustdoc: &Value) -> Result<impl Iterator<Item = Enum> + use<'_>, anyhow::Error> {
-    let enums = enumerate_rust_types(rustdoc)?.flat_map(|s| match s {
-        RustType::Struct { .. } => None,
-        RustType::Enum { item, .. } => Some(item),
-    });
-
-    Ok(enums)
-}
-
 pub fn find_all_rusttype_fq_path(rustdoc: &Value) -> anyhow::Result<HashSet<FqIdent>> {
     let mut fq_idents = HashSet::new();
     let paths = rustdoc
@@ -106,9 +38,10 @@ pub fn find_all_rusttype_fq_path(rustdoc: &Value) -> anyhow::Result<HashSet<FqId
     Ok(fq_idents)
 }
 
-pub fn enumerate_rust_types(
-    rustdoc: &Value,
-) -> anyhow::Result<impl std::iter::Iterator<Item = RustType> + use<'_>> {
+pub fn enumerate_rust_types<'a>(
+    rustdoc: &'a Value,
+    path_cache: &'a PathCache,
+) -> anyhow::Result<impl std::iter::Iterator<Item = RustType> + 'a> {
     let all_fields = parse_all_struct_fields(rustdoc)?
         .into_iter()
         .map(|f| (f.id.clone(), f))
@@ -131,6 +64,9 @@ pub fn enumerate_rust_types(
                     .iter()
                     .flat_map(|id| all_fields.get(&id).cloned())
                     .collect(),
+                fq_path: FqIdent::try_from_str(&struct_.name)
+                    .ok()
+                    .and_then(|p| path_cache.find_fully_qualified_path(&p)),
                 item: struct_,
             })
             .or_else(|| {
@@ -140,6 +76,9 @@ pub fn enumerate_rust_types(
                         .iter()
                         .flat_map(|id| all_variants.get(id).cloned())
                         .collect(),
+                    fq_path: FqIdent::try_from_str(&enum_.name)
+                        .ok()
+                        .and_then(|p| path_cache.find_fully_qualified_path(&p)),
                     item: enum_,
                 })
             })
@@ -277,145 +216,65 @@ impl ValueExt for &Value {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use core::panic;
 
     use super::*;
 
+    //TODO: write basic tests
     #[test]
-    fn test_find_all_structs() {
+    fn test_parse_rust_type() {
         let rustdoc = get_test_data();
+        let cache = Cache::new_from_rust_doc_json(rustdoc).unwrap();
 
-        let structs = find_all_structs(&rustdoc).unwrap();
-        assert_eq!(structs.len(), 15);
+        const COUNT: usize = 17;
+        assert_eq!(cache.types.len(), COUNT);
+
+        let fq_names = cache
+            .types
+            .iter()
+            .flat_map(|t| t.fully_qualified_path())
+            .map(|t| t.to_string())
+            .collect::<Vec<_>>();
         assert_eq!(
-            structs.iter().map(|s| s.name.clone()).collect::<Vec<_>>(),
-            vec![
-                "NestedDestInnerType",
-                "Test",
-                "Test2",
-                "TestNestedField",
-                "TestNestedFieldTo",
-                "DestInnerType",
-                "DestType",
-                "SourceInnerType",
-                "SourceType",
-                "SourceInnerTypeWthDifferentInnerTypeCanBeCasted",
-                "SourceStructWithEnumField",
-                "DestStructWithEnumField",
-                "NestedSourceInnerType",
-                "NestedDestType",
-                "NestedSourceType"
+            fq_names.len(),
+            COUNT,
+            "All types must have fully qualified paths"
+        );
+
+        assert_eq!(
+            fq_names,
+            &[
+                "crate::nested::nested_inner::NestedDestInnerType",
+                "crate::nested::NestedSourceType",
+                "crate::Test",
+                "crate::Test2",
+                "crate::TestNestedField",
+                "crate::TestNestedFieldTo",
+                "crate::DestInnerType",
+                "crate::DestType",
+                "crate::SourceInnerType",
+                "crate::SourceType",
+                "crate::SourceInnerTypeWthDifferentInnerTypeCanBeCasted",
+                "crate::SourceEnum",
+                "crate::SourceStructWithEnumField",
+                "crate::DestEnum",
+                "crate::DestStructWithEnumField",
+                "crate::nested::nested_inner::NestedSourceInnerType",
+                "crate::nested::NestedDestType"
             ]
         );
     }
 
     #[test]
-    fn test_find_struct_and_resolve_field() {
-        let rustdoc = get_test_data();
-
-        verify_fields_of_struct(&rustdoc, "Test", &["left", "right", "expected", "name"]);
-
-        let rustdoc = get_test_data();
-
-        verify_fields_of_struct(&rustdoc, "Test", &["left", "right", "expected", "name"]);
-        verify_fields_of_struct(&rustdoc, "Test2", &["left", "right", "expected", "name"]);
-    }
-
-    #[test]
-    fn test_find_struct_with_nested_field_and_resolve_field() {
-        let rustdoc = get_test_data();
-
-        let (_structs, fields) = find_struct_and_resolve_fields(
-            &FqIdent::try_from_str("TestNestedField").unwrap(),
-            &rustdoc,
-        )
-        .unwrap();
-        assert_eq!(5, fields.len());
-        let mut fields = fields.into_iter();
-        fields.next().unwrap(); // left
-        fields.next().unwrap(); // right
-        fields.next().unwrap(); // expected
-
-        let nested_test = fields.next().unwrap();
-        dbg!(&nested_test);
-        assert!(nested_test.external_crate_name.is_none());
-
-        match &nested_test.ty {
-            StructFieldKind::ResolvedPath(ResolvedPathStructField { name, .. }) => {
-                assert_eq!(name, &"Test".to_string());
-            }
-            _ => panic!("Expected ResolvedPath"),
-        }
-
-        let nested_extn_crate = fields.next().unwrap();
-        dbg!(&nested_extn_crate);
-        assert!(nested_extn_crate.external_crate_name.is_none());
-
-        match &nested_extn_crate.ty {
-            StructFieldKind::ResolvedPath(ResolvedPathStructField { name, .. }) => {
-                assert_eq!(name, &"std::path::PathBuf".to_string());
-            }
-            _ => panic!("Expected ResolvedPath"),
-        }
-    }
-
-    fn verify_fields_of_struct(rustdoc: &Value, struct_name: &str, expected_fields: &[&str]) {
-        let (structs, fields) =
-            find_struct_and_resolve_fields(&FqIdent::try_from_str(struct_name).unwrap(), &rustdoc)
-                .unwrap();
-        assert_eq!(structs.name, struct_name.to_string());
-        assert_eq!(
-            fields.iter().map(|s| s.name.clone()).collect::<Vec<_>>(),
-            expected_fields
-        );
-    }
-
-    #[test]
-    fn test_parse_all_struct_fields() {
-        let rustdoc = get_test_data();
-
-        let fields = parse_all_struct_fields(&rustdoc).unwrap();
-        assert_eq!(fields.len(), 28);
-    }
-
-    #[test]
-    fn test_find_all_struct_and_fq_path() {
-        let rustdoc = get_test_data();
-
-        let structs = find_all_rusttype_fq_path(&rustdoc).unwrap();
-        assert_eq!(structs.len(), 1859);
-    }
-
-    #[test]
-    fn test_find_all_enums() {
-        let rustdoc = get_test_data();
-
-        let enums = enumerate_enums(&rustdoc).unwrap().collect::<Vec<_>>();
-        assert_eq!(enums.len(), 2);
-        assert_eq!(enums[0].name, "SourceEnum".to_string());
-        assert_eq!(enums[1].name, "DestEnum".to_string());
-    }
-
-    #[test]
-    fn test_find_all_rust_type_cache() {
-        let rustdoc = get_test_data();
-        let items = enumerate_rust_types(&rustdoc).unwrap().collect::<Vec<_>>();
-
-        assert_eq!(items.len(), 17);
-    }
-
-    #[test]
     fn test_type_cache() {
         let rustdoc = get_test_data();
-        let type_cache = Cache::new_from_rust_doc_json(rustdoc).unwrap();
-        let rust_type = type_cache
-            .find(&FqIdent::try_from_str("Test").unwrap())
-            .unwrap();
+        let cache = Cache::new_from_rust_doc_json(rustdoc).unwrap();
+        let rust_type = cache.find(&FqIdent::try_from_str("Test").unwrap()).unwrap();
         assert_eq!(rust_type.name(), "Test".to_string());
     }
 
-    fn get_test_data() -> Value {
+    pub(crate) fn get_test_data() -> Value {
         let json = include_str!("../../usage/rustdoc.json");
         let rustdoc: Value = serde_json::from_str(json).unwrap();
         rustdoc

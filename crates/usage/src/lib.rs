@@ -139,7 +139,7 @@ fn mapping_casts_primitive_types() {
     };
     let result = source_to_dest(input.clone());
 
-    assert_eq!(result.inner_field, input.inner_field as _);
+    assert_eq!(result.inner_field, input.inner_field as i32);
 }
 
 #[derive(Clone, Debug, PartialEq)]
