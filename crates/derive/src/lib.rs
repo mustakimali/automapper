@@ -100,7 +100,9 @@ impl ToTokens for TraitImpl {
         let source_ty_name = self.mapping.source_type.clone();
         let dest_ty_name = self.mapping.dest_type.clone();
         let method_name = self.iden.clone();
+
         tokens.extend(quote! {
+            /// Converts from `#source_ty_name` to `#dest_ty_name`
             fn #method_name(value: #source_ty_name) -> #dest_ty_name {
                 #root
             }
