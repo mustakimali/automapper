@@ -108,12 +108,12 @@ pub fn parse_all_eunm_variants(rustdoc: &Value) -> anyhow::Result<Vec<EnumVarian
         .as_object()
         .context("parse .index as object")?;
 
-    let structs = index
+    let variants = index
         .iter()
         .flat_map(|(_id, node)| parse_enum_variant(node).ok())
         .collect::<Vec<_>>();
 
-    Ok(structs)
+    Ok(variants)
 }
 
 fn parse_struct(rustdoc: &Value) -> anyhow::Result<Struct> {

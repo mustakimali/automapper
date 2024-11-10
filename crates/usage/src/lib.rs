@@ -172,3 +172,40 @@ fn basic_enum_mapping() {
     let result = source_to_dest(input.clone());
     assert_eq!(result.enum_field, DestEnum::Variant1);
 }
+
+#[derive(Clone, Debug, PartialEq)]
+struct CmplexEnumSourceStruct {
+    enum_field: ComplexEnumSource,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct CmplexEnumDestStruct {
+    enum_field: ComplexEnumDest,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum ComplexEnumSource {
+    Plain,
+    WithField { field: u64 },
+    SingleField(u64),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum ComplexEnumDest {
+    Plain,
+    WithField { field: u64 },
+    SingleField(u64),
+}
+
+#[test]
+fn complex_enum_mapping() {
+    let input = CmplexEnumSourceStruct {
+        enum_field: ComplexEnumSource::WithField { field: 1 },
+    };
+
+    lazy_map! {
+        fn source_to_dest(CmplexEnumSourceStruct, CmplexEnumDestStruct);
+    };
+    let result = source_to_dest(input.clone());
+    assert_eq!(result.enum_field, ComplexEnumDest::WithField { field: 1 });
+}

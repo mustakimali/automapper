@@ -52,7 +52,11 @@ impl Cache {
         self.types.iter().find(|ty| match &fq_path {
             Some(fq) => ty.equals_fq_path(fq),
             //None => ty.name().ends_with(&ident.name_string()),
-            None => unimplemented!(),
+            None => {
+                let e = format!("failed to find fq path for {:?}", ident);
+                dbg!(e);
+                false
+            }
         })
     }
 }

@@ -117,10 +117,22 @@ impl Hash for StructField {
     }
 }
 
+// ComplexEnumSource: 439 (enum)
+// Variants: 488, 490, 492
+// 488 - plain
+// 490 - struct
+// 492 - toupe
+
 #[derive(Debug, serde::Deserialize, Clone, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum EnumVariantKind {
-    Plain { discriminant: Option<String> },
+    Plain {
+        discriminant: Option<String>,
+    },
+    Struct {
+        fields: Vec<u32>,
+        has_stripped_fields: bool,
+    },
 }
 
 impl StructField {
