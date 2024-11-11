@@ -26,6 +26,8 @@ pub enum RustType {
         item: Struct,
         fq_path: Option<FqIdent>,
         fields: Vec<StructField>,
+
+        rdoc_item: rustdoc_types::Struct,
     },
     Enum {
         item: Enum,

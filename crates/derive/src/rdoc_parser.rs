@@ -5,6 +5,7 @@ use models::*;
 use quote::format_ident;
 use serde_json::Value;
 use thiserror::__private::AsDisplay;
+use tracing::field::debug;
 
 pub mod models;
 
@@ -38,6 +39,7 @@ pub fn find_all_rusttype_fq_path(rustdoc: &Value) -> anyhow::Result<HashSet<FqId
     Ok(fq_idents)
 }
 
+#[allow(unreachable_code, unused_variables)]
 pub fn enumerate_rust_types<'a>(
     rustdoc: &'a Value,
     path_cache: &'a PathCache,
@@ -55,6 +57,60 @@ pub fn enumerate_rust_types<'a>(
         .context("locate .index")?
         .as_object()
         .context("parse .index as object")?;
+
+    let rdocs: rustdoc_types::Crate = serde_json::from_value(rustdoc.clone())?;
+    let rust_type = rdocs.index.iter().flat_map(|(_, item)| match &item.inner {
+        rustdoc_types::ItemEnum::Struct(struct_) => {
+            let name = item.name.clone().expect("item.name");
+            let mapped_struct = RustType::Struct {
+                fq_path: FqIdent::try_from_str(&name)
+                    .ok()
+                    .and_then(|p| path_cache.find_fully_qualified_path(&p)),
+                item: Struct {
+                    name,
+                    field_ids: <_>::default(),
+                },
+                fields: <_>::default(),
+                rdoc_item: struct_.clone(),
+            };
+
+            Some(mapped_struct)
+        }
+
+        rustdoc_types::ItemEnum::Enum(enum_) => {
+            let name = item.name.clone().expect("item.name");
+
+            let mapped_enum = RustType::Enum {
+                fq_path: FqIdent::try_from_str(&name)
+                    .ok()
+                    .and_then(|p| path_cache.find_fully_qualified_path(&p)),
+
+                variants: enum_
+                    .variants
+                    .iter()
+                    .flat_map(|id| rdocs.index.get(id))
+                    .map(|item| match &item.inner {
+                        rustdoc_types::ItemEnum::Variant(variant) => EnumVariant {
+                            id: todo!(),
+                            name: name.clone(),
+                            ty: todo!(),
+                        },
+                        _ => unreachable!("unexpected item kind in enum variant"),
+                    })
+                    .collect(),
+
+                item: Enum {
+                    name,
+                    variant_ids: <_>::default(), //todo: remove
+                },
+            };
+
+            Some(mapped_enum)
+        }
+
+        _ => None,
+    });
+
     let rust_types = index.iter().flat_map(move |(_, root_item)| {
         parse_struct(root_item)
             .ok()
@@ -68,6 +124,7 @@ pub fn enumerate_rust_types<'a>(
                     .ok()
                     .and_then(|p| path_cache.find_fully_qualified_path(&p)),
                 item: struct_,
+                rdoc_item: todo!(),
             })
             .or_else(|| {
                 parse_enum(root_item).ok().map(|enum_| RustType::Enum {
