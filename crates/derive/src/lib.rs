@@ -348,6 +348,7 @@ impl ToTokens for StructMapping {
                 let enum_f = quote! {
                     match #(#enum_field_path).* {
                         #(#mapped_variant)*
+                        _ => panic!("Invalid enum variant"),
                     }
                 };
                 let o = enum_f.to_string();

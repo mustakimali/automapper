@@ -227,7 +227,7 @@ pub mod test {
         let rustdoc = get_test_data();
         let cache = Cache::new_from_rust_doc_json(rustdoc).unwrap();
 
-        const COUNT: usize = 17;
+        const COUNT: usize = 21;
         assert_eq!(cache.types.len(), COUNT);
 
         let fq_names = cache
@@ -260,6 +260,10 @@ pub mod test {
                 "crate::SourceStructWithEnumField",
                 "crate::DestEnum",
                 "crate::DestStructWithEnumField",
+                "crate::ComplexEnumSource",
+                "crate::CmplexEnumSourceStruct",
+                "crate::ComplexEnumDest",
+                "crate::CmplexEnumDestStruct",
                 "crate::nested::nested_inner::NestedSourceInnerType",
                 "crate::nested::NestedDestType"
             ]
