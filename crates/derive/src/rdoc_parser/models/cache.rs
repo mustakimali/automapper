@@ -15,6 +15,7 @@ pub struct Cache {
     pub types: Vec<RustType>,
     pub paths: PathCache,
     pub rustdoc_json: Value,
+    pub rdocs: rustdoc_types::Crate,
 }
 
 impl Cache {
@@ -28,6 +29,8 @@ impl Cache {
     }
 
     pub fn new_from_rust_doc_json(rustdoc_json: Value) -> anyhow::Result<Self> {
+        let rdocs = serde_json::from_value(rustdoc_json.clone())
+            .context("failed to parse rustdoc.json into rustdoc_types::Crate")?;
         let path_cache = rdoc_parser::find_all_rusttype_fq_path(&rustdoc_json)
             .context("failed to find all struct and fq path")?
             .into_iter()
@@ -35,7 +38,7 @@ impl Cache {
 
         let paths = PathCache::new(path_cache);
 
-        let types = rdoc_parser::enumerate_rust_types(&rustdoc_json, &paths)
+        let types = rdoc_parser::enumerate_rust_types(&rdocs, &paths)
             .context("failed to enumerate rust types")?
             .collect::<Vec<_>>();
 
@@ -43,6 +46,7 @@ impl Cache {
             types,
             paths,
             rustdoc_json,
+            rdocs,
         })
     }
 

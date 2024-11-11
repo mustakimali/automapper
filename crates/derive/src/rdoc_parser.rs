@@ -41,25 +41,24 @@ pub fn find_all_rusttype_fq_path(rustdoc: &Value) -> anyhow::Result<HashSet<FqId
 
 #[allow(unreachable_code, unused_variables)]
 pub fn enumerate_rust_types<'a>(
-    rustdoc: &'a Value,
+    rdocs: &'a rustdoc_types::Crate,
     path_cache: &'a PathCache,
 ) -> anyhow::Result<impl std::iter::Iterator<Item = RustType> + 'a> {
-    let all_fields = parse_all_struct_fields(rustdoc)?
-        .into_iter()
-        .map(|f| (f.id.clone(), f))
-        .collect::<HashMap<_, _>>();
-    let all_variants = parse_all_eunm_variants(rustdoc)?
-        .into_iter()
-        .map(|f| (f.id.clone(), f))
-        .collect::<HashMap<_, _>>();
-    let index = rustdoc
-        .get("index")
-        .context("locate .index")?
-        .as_object()
-        .context("parse .index as object")?;
+    // let all_fields = parse_all_struct_fields(rdocs)?
+    //     .into_iter()
+    //     .map(|f| (f.id.clone(), f))
+    //     .collect::<HashMap<_, _>>();
+    // let all_variants = parse_all_eunm_variants(rdocs)?
+    //     .into_iter()
+    //     .map(|f| (f.id.clone(), f))
+    //     .collect::<HashMap<_, _>>();
+    // let index = rdocs
+    //     .get("index")
+    //     .context("locate .index")?
+    //     .as_object()
+    //     .context("parse .index as object")?;
 
-    let rdocs: rustdoc_types::Crate = serde_json::from_value(rustdoc.clone())?;
-    let rust_type = rdocs.index.iter().flat_map(|(_, item)| match &item.inner {
+    let rust_types = rdocs.index.iter().flat_map(|(_, item)| match &item.inner {
         rustdoc_types::ItemEnum::Struct(struct_) => {
             let name = item.name.clone().expect("item.name");
             let mapped_struct = RustType::Struct {
@@ -91,9 +90,39 @@ pub fn enumerate_rust_types<'a>(
                     .flat_map(|id| rdocs.index.get(id))
                     .map(|item| match &item.inner {
                         rustdoc_types::ItemEnum::Variant(variant) => EnumVariant {
-                            id: todo!(),
+                            id: Id::from(item.id.0.to_string()),
                             name: name.clone(),
-                            ty: todo!(),
+                            ty: match &item.inner {
+                                rustdoc_types::ItemEnum::Variant(variant) => match &variant.kind {
+                                    rustdoc_types::VariantKind::Tuple(_) => {
+                                        unimplemented!("touple variant")
+                                    }
+                                    rustdoc_types::VariantKind::Plain => {
+                                        EnumVariantKind::Plain { discriminant: None }
+                                    }
+                                    rustdoc_types::VariantKind::Struct {
+                                        fields,
+                                        has_stripped_fields,
+                                    } => EnumVariantKind::Struct {
+                                        fields: fields
+                                            .iter()
+                                            .flat_map(|id| rdocs.index.get(id))
+                                            .map(|f| match &f.inner {
+                                                rustdoc_types::ItemEnum::StructField(
+                                                    struct_field,
+                                                ) => f.id.0,
+                                                _ => {
+                                                    unreachable!(
+                                                        "unexpected item kind in enum variant"
+                                                    )
+                                                }
+                                            })
+                                            .collect(),
+                                        has_stripped_fields: false,
+                                    },
+                                },
+                                _ => unreachable!("unexpected item kind in enum variant"),
+                            },
                         },
                         _ => unreachable!("unexpected item kind in enum variant"),
                     })
@@ -111,35 +140,35 @@ pub fn enumerate_rust_types<'a>(
         _ => None,
     });
 
-    let rust_types = index.iter().flat_map(move |(_, root_item)| {
-        parse_struct(root_item)
-            .ok()
-            .map(|struct_| RustType::Struct {
-                fields: struct_
-                    .field_ids
-                    .iter()
-                    .flat_map(|id| all_fields.get(&id).cloned())
-                    .collect(),
-                fq_path: FqIdent::try_from_str(&struct_.name)
-                    .ok()
-                    .and_then(|p| path_cache.find_fully_qualified_path(&p)),
-                item: struct_,
-                rdoc_item: todo!(),
-            })
-            .or_else(|| {
-                parse_enum(root_item).ok().map(|enum_| RustType::Enum {
-                    variants: enum_
-                        .variant_ids
-                        .iter()
-                        .flat_map(|id| all_variants.get(id).cloned())
-                        .collect(),
-                    fq_path: FqIdent::try_from_str(&enum_.name)
-                        .ok()
-                        .and_then(|p| path_cache.find_fully_qualified_path(&p)),
-                    item: enum_,
-                })
-            })
-    });
+    // let rust_types = index.iter().flat_map(move |(_, root_item)| {
+    //     parse_struct(root_item)
+    //         .ok()
+    //         .map(|struct_| RustType::Struct {
+    //             fields: struct_
+    //                 .field_ids
+    //                 .iter()
+    //                 .flat_map(|id| all_fields.get(&id).cloned())
+    //                 .collect(),
+    //             fq_path: FqIdent::try_from_str(&struct_.name)
+    //                 .ok()
+    //                 .and_then(|p| path_cache.find_fully_qualified_path(&p)),
+    //             item: struct_,
+    //             rdoc_item: todo!(),
+    //         })
+    //         .or_else(|| {
+    //             parse_enum(root_item).ok().map(|enum_| RustType::Enum {
+    //                 variants: enum_
+    //                     .variant_ids
+    //                     .iter()
+    //                     .flat_map(|id| all_variants.get(id).cloned())
+    //                     .collect(),
+    //                 fq_path: FqIdent::try_from_str(&enum_.name)
+    //                     .ok()
+    //                     .and_then(|p| path_cache.find_fully_qualified_path(&p)),
+    //                 item: enum_,
+    //             })
+    //         })
+    // });
     Ok(rust_types)
 }
 
