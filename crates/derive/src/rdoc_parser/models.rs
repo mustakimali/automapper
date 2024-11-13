@@ -135,6 +135,9 @@ pub enum EnumVariantKind {
         fields: Vec<u32>,
         has_stripped_fields: bool,
     },
+    Touple {
+        fields: Vec<u32>,
+    },
 }
 
 impl StructField {

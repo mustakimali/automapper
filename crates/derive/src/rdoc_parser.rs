@@ -61,6 +61,14 @@ pub fn enumerate_rust_types<'a>(
     let rust_types = rdocs.index.iter().flat_map(|(_, item)| match &item.inner {
         rustdoc_types::ItemEnum::Struct(struct_) => {
             let name = item.name.clone().expect("item.name");
+            let fields = match &struct_.kind {
+                rustdoc_types::StructKind::Unit => todo!(),
+                rustdoc_types::StructKind::Tuple(_) => todo!(),
+                rustdoc_types::StructKind::Plain {
+                    fields,
+                    has_stripped_fields,
+                } => todo!(),
+            };
             let mapped_struct = RustType::Struct {
                 fq_path: FqIdent::try_from_str(&name)
                     .ok()
@@ -69,7 +77,7 @@ pub fn enumerate_rust_types<'a>(
                     name,
                     field_ids: <_>::default(),
                 },
-                fields: <_>::default(),
+                fields,
                 rdoc_item: struct_.clone(),
             };
 
@@ -94,8 +102,11 @@ pub fn enumerate_rust_types<'a>(
                             name: name.clone(),
                             ty: match &item.inner {
                                 rustdoc_types::ItemEnum::Variant(variant) => match &variant.kind {
-                                    rustdoc_types::VariantKind::Tuple(_) => {
-                                        unimplemented!("touple variant")
+                                    rustdoc_types::VariantKind::Tuple(fields) => {
+                                        let fields = fields.clone().into_iter().flatten().collect();
+                                        EnumVariantKind::Touple {
+                                            fields: fields.iter().map(|f| f.0).collect(),
+                                        }
                                     }
                                     rustdoc_types::VariantKind::Plain => {
                                         EnumVariantKind::Plain { discriminant: None }
@@ -104,20 +115,7 @@ pub fn enumerate_rust_types<'a>(
                                         fields,
                                         has_stripped_fields,
                                     } => EnumVariantKind::Struct {
-                                        fields: fields
-                                            .iter()
-                                            .flat_map(|id| rdocs.index.get(id))
-                                            .map(|f| match &f.inner {
-                                                rustdoc_types::ItemEnum::StructField(
-                                                    struct_field,
-                                                ) => f.id.0,
-                                                _ => {
-                                                    unreachable!(
-                                                        "unexpected item kind in enum variant"
-                                                    )
-                                                }
-                                            })
-                                            .collect(),
+                                        fields: fields.iter().map(|f| f.0).collect(),
                                         has_stripped_fields: false,
                                     },
                                 },
