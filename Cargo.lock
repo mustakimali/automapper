@@ -9,6 +9,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c042108f3ed77fd83760a5fd79b53be043192bb3b9dba91d8c574c0ada7850c8"
 
 [[package]]
+name = "automapper"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "derivative",
+ "proc-macro2",
+ "quote",
+ "rustdoc-json",
+ "rustdoc-types",
+ "serde",
+ "serde_json",
+ "syn 2.0.85",
+ "thiserror",
+ "tracing",
+ "walkdir",
+]
+
+[[package]]
 name = "camino"
 version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -358,6 +376,7 @@ checksum = "e91b56cd4cadaeb79bbf1a5645f6b4f8dc5bde8834ad5894a8db35fda9efa1fe"
 name = "usage"
 version = "0.1.0"
 dependencies = [
+ "automapper",
  "lazy-to-map-derive",
  "rustdoc-json",
 ]

@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+automapper = { path = "../automapper" }
 lazy-to-map-derive = { path = "../derive" }
 rustdoc-json = { workspace = true }
