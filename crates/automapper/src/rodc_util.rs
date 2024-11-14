@@ -1,8 +1,8 @@
-use anyhow::Context;
+use anyhow::{anyhow, bail, Context};
 use rustdoc_types::{Crate, ItemSummary};
 
 fn find_struct_by_name(name: syn::Path, rdoc: &Crate) -> anyhow::Result<StructWrapper> {
-    let (exact_match, item) = {
+    let (exact_match, path_entry) = {
         let segments = name
             .segments
             .iter()
@@ -22,11 +22,17 @@ fn find_struct_by_name(name: syn::Path, rdoc: &Crate) -> anyhow::Result<StructWr
     }
     .context("find struct by name")?;
 
-    match item.kind {
-        rustdoc_types::ItemKind::Struct => todo!(),
+    let rustdoc_types::ItemKind::Struct = path_entry.kind else {
+        bail!("not a struct type")
+    };
 
-        _ => unimplemented!(),
-    }
+    let (id, item) = rdoc
+        .index
+        .iter()
+        .find(|(_, item)| item.id == item.id)
+        .context("locate struct in .index")?;
+
+    dbg!(&item);
 
     todo!()
 }
@@ -37,7 +43,15 @@ struct StructWrapper {
 
 #[cfg(test)]
 mod test {
+    use quote::format_ident;
+
     use super::*;
+
+    #[test]
+    fn find_struct() {
+        let rdoc = get_test_data();
+        find_struct_by_name(format_ident!("Test").into(), &rdoc);
+    }
 
     pub(crate) fn get_test_data() -> Crate {
         let json = include_str!("../../usage/rustdoc.json");

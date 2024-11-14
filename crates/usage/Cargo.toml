@@ -7,3 +7,7 @@ edition = "2021"
 automapper = { path = "../automapper" }
 lazy-to-map-derive = { path = "../derive" }
 rustdoc-json = { workspace = true }
+grpc-build-core = "0.3.0"
+
+[build-dependencies]
+grpc-build = "6.1.1"
