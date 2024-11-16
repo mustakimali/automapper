@@ -97,7 +97,7 @@ fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFie
             let rustdoc_types::ItemEnum::StructField(ty) = &item.inner else {
                 unreachable!("must be a struct field")
             };
-            dbg!(&ty);
+
             let kind = match ty {
                 rustdoc_types::Type::ResolvedPath(path) => {
                     StructFieldKind::ResolvedPath { path: path.clone() }
@@ -121,6 +121,12 @@ pub struct StructWrapper {
     is_exact_match: bool,
     path: Vec<String>,
     kind: StructKind,
+}
+
+impl StructWrapper {
+    pub fn name(&self) -> &str {
+        self.path.last().expect("name")
+    }
 }
 
 #[derive(Debug)]
@@ -152,9 +158,13 @@ mod test {
     #[test]
     fn find_struct() {
         let rdoc = get_test_data();
-        let struct_ = find_struct_by_name(format_ident!("Test").into(), &rdoc);
-        dbg!(struct_);
-        panic!();
+        let struct_ = find_struct_by_name(format_ident!("Test").into(), &rdoc).unwrap();
+        assert_eq!(struct_.len(), 1);
+        assert!(!struct_[0].is_exact_match);
+
+        let struct_ = find_struct_by_name(syn::parse_str("usage::Test").unwrap(), &rdoc).unwrap();
+        assert_eq!(struct_.len(), 1);
+        assert!(struct_[0].is_exact_match);
     }
 
     pub(crate) fn get_test_data() -> Crate {
