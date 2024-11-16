@@ -65,7 +65,7 @@ impl Parse for Request {
 impl ToTokens for TraitImpl {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let cargo_toml_path = caller_crate_cargo_toml();
-        let rustdoc_path = cargo_toml_path.parent().unwrap().join("rustdoc.json");
+        let rustdoc_path = cargo_toml_path.parent().unwrap().join("rustdoc_v2.json");
 
         if !rustdoc_path.exists() {
             eprintln!(
@@ -78,14 +78,32 @@ impl ToTokens for TraitImpl {
             return;
         };
 
-        let rdoc = {
+        let rdocs = {
             let content =
                 std::fs::read_to_string(rustdoc_path).expect("read rustdoc.json file from disk");
             serde_json::from_str::<rustdoc_types::Crate>(&content)
                 .expect("parse rustdoc.json as json")
         };
 
-        dbg!(&self);
+        let source = rodc_util::find_struct_by_exact_name(self.mapping.source_type.clone(), &rdocs)
+            .with_context(|| {
+                format!(
+                    "failed to find source struct: {}",
+                    self.mapping.source_type.to_token_stream().to_string()
+                )
+            })
+            .unwrap();
+
+        let dest = rodc_util::find_struct_by_exact_name(self.mapping.dest_type.clone(), &rdocs)
+            .with_context(|| {
+                format!(
+                    "failed to find dest struct: {}",
+                    self.mapping.dest_type.to_token_stream().to_string()
+                )
+            })
+            .unwrap();
+
+        dbg!(&source, &dest);
         unimplemented!()
     }
 }

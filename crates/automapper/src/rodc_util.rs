@@ -1,9 +1,23 @@
 use anyhow::{anyhow, bail, Context};
+use quote::ToTokens;
 use rustdoc_types::{Crate, Item, ItemSummary};
 
 //
 // Public
 //
+
+pub fn find_struct_by_exact_name(name: syn::Path, rdocs: &Crate) -> anyhow::Result<StructWrapper> {
+    let items = find_struct_by_name(name.clone(), rdocs)?;
+    items
+        .into_iter()
+        .find(|i| i.is_exact_match)
+        .with_context(|| {
+            format!(
+                "failed to find struct by exact name: {}",
+                name.to_token_stream().to_string(),
+            )
+        })
+}
 
 /// Find structs by name.
 ///

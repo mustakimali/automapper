@@ -20,7 +20,7 @@ fn basic_struct() {
         s: "hello".to_string(),
     };
     automapper::map! {
-        fn mapping(SourceStruct, DestStruct);
+        fn mapping(usage::v2::SourceStruct, usage::v2::DestStruct);
     };
     let output = mapping(input.clone());
 }
