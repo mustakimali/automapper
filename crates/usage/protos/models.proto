@@ -1,0 +1,31 @@
+syntax = "proto3";
+package example;
+
+import "google/protobuf/empty.proto";
+
+message Person {
+    string first_name = 1;
+    string last_name = 2;
+    Gender gender = 3;
+}
+
+message Gender {
+    oneof gender {
+        google.protobuf.Empty male = 1;
+        google.protobuf.Empty female = 2;
+    }
+}
+
+
+message HomoSepiens {
+    string first_name = 1;
+    string last_name = 2;
+    HomoSepiensGender gender = 3;
+}
+
+message HomoSepiensGender {
+    oneof gender {
+        google.protobuf.Empty male = 1;
+        google.protobuf.Empty female = 2;
+    }
+}

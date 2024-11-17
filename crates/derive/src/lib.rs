@@ -226,7 +226,7 @@ impl StructMapping {
         }
     }
 
-    fn map_struct(&self, dest_fields: &Vec<StructField>, tokens: &mut proc_macro2::TokenStream) {
+    fn map_struct(&self, dest_fields: &[StructField], tokens: &mut proc_macro2::TokenStream) {
         let RustType::Struct {
             item: _,
             fields: source_fields,
@@ -296,7 +296,7 @@ impl ToTokens for StructMapping {
                 self.map_struct(fields, tokens);
             }
             RustType::Enum {
-                item,
+                item: _,
                 variants: dest_variants,
                 ..
             } => {
