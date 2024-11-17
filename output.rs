@@ -1,4 +1,4 @@
-fn mapping(value : v2 :: SourceStruct2) -> v2 :: DestStruct2
+fn __map(value : v2 :: SourceStruct2) -> v2 :: DestStruct2
 {
     v2 :: DestStruct2
     {

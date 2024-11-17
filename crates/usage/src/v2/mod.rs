@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use automapper::AutoMapsTo;
+
 #[derive(Debug, Clone)]
 struct SourceStruct {
     a: i32,
@@ -24,10 +26,9 @@ fn basic_struct() {
     };
 
     //TODO: support for `create::*` syntax
-    automapper::map! {
-        fn mapping(v2::SourceStruct, v2::DestStruct);
-    };
-    let output = mapping(input.clone());
+    automapper::map!(v2::SourceStruct, v2::DestStruct);
+    let output = input.clone().map_to();
+
     assert_eq!(input.a, output.a);
     assert_eq!(input.b, output.b);
     assert_eq!(input.s, output.s);
@@ -57,10 +58,13 @@ fn nested_struct() {
         },
     };
 
-    automapper::map! {
-        fn mapping(v2::SourceStruct2, v2::DestStruct2);
-    };
-    let output = mapping(input.clone());
+    // automapper::map! {
+    //     fn mapping(v2::SourceStruct2, v2::DestStruct2);
+    // };
+    // let output = mapping(input.clone());
+    automapper::map!(v2::SourceStruct2, v2::DestStruct2);
+    let output = input.clone().map_to();
+
     assert_eq!(input.s, output.s);
     assert_eq!(input.nested.a, output.nested.a);
     assert_eq!(input.nested.b, output.nested.b);

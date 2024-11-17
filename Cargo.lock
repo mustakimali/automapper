@@ -76,6 +76,13 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 name = "automapper"
 version = "0.1.0"
 dependencies = [
+ "automapper-proc",
+]
+
+[[package]]
+name = "automapper-proc"
+version = "0.1.0"
+dependencies = [
  "anyhow",
  "derivative",
  "proc-macro2",
@@ -823,6 +830,7 @@ name = "usage"
 version = "0.1.0"
 dependencies = [
  "automapper",
+ "automapper-proc",
  "grpc-build",
  "grpc-build-core",
  "lazy-to-map-derive",
