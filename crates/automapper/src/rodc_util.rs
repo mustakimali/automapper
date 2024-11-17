@@ -6,15 +6,17 @@ use rustdoc_types::{Crate, Item, ItemSummary};
 // Public
 //
 
-pub fn find_struct_by_exact_name(name: syn::Path, rdocs: &Crate) -> anyhow::Result<StructWrapper> {
-    let items = find_struct_by_name(name.clone(), rdocs)?;
+pub fn find_struct_by_exact_name(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<StructWrapper> {
+    let items = find_struct_by_name(name, rdocs)?;
     items
-        .into_iter()
+        .iter()
         .find(|i| i.is_exact_match)
+        .or_else(|| items.iter().next())
+        .cloned()
         .with_context(|| {
             format!(
-                "failed to find struct by exact name: {}",
-                name.to_token_stream().to_string(),
+                "failed to find struct: {}",
+                name.to_token_stream().to_string()
             )
         })
 }
@@ -24,7 +26,7 @@ pub fn find_struct_by_exact_name(name: syn::Path, rdocs: &Crate) -> anyhow::Resu
 /// This function will return a list of structs that match the given name partially or exactly.
 /// Check the [StructWrapper::is_exact_match] field to see if the match was exact or not.
 ///
-pub fn find_struct_by_name(name: syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<StructWrapper>> {
+pub fn find_struct_by_name(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<StructWrapper>> {
     let matching_structs = {
         let segments = name
             .segments
@@ -130,7 +132,7 @@ fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFie
         .collect::<Vec<_>>()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StructWrapper {
     is_exact_match: bool,
     path: Vec<String>,
@@ -143,21 +145,21 @@ impl StructWrapper {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StructKind {
     Unit,
     Tuple(Vec<StructField>),
     Plain { fields: Vec<StructField> },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StructField {
     /// Unset for tuple fields
     name: Option<String>,
     kind: StructFieldKind,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StructFieldKind {
     Primitive { name: String },
     ResolvedPath { path: rustdoc_types::Path },

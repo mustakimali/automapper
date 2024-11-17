@@ -1,19 +1,24 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, ops::Deref, path::PathBuf, sync::Arc};
 
 use anyhow::Context;
+use models::context::MacroCtx;
 use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
+use rodc_util::StructWrapper;
 use serde_json::Value;
+use struct_to_struct_mapping::StructToStructMapping;
 use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
     DeriveInput, Meta, Token,
 };
 use walkdir::WalkDir;
 
+mod models;
 mod rodc_util;
+mod struct_to_struct_mapping;
 
 #[derive(Debug)]
 struct TraitImpl {
@@ -85,32 +90,26 @@ impl ToTokens for TraitImpl {
                 .expect("parse rustdoc.json as json")
         };
 
-        let source = rodc_util::find_struct_by_exact_name(self.mapping.source_type.clone(), &rdocs)
-            .with_context(|| {
-                format!(
-                    "failed to find source struct: {}",
-                    self.mapping.source_type.to_token_stream().to_string()
-                )
-            })
-            .unwrap();
+        let ctx = MacroCtx::new(rdocs);
 
-        let dest = rodc_util::find_struct_by_exact_name(self.mapping.dest_type.clone(), &rdocs)
-            .with_context(|| {
-                format!(
-                    "failed to find dest struct: {}",
-                    self.mapping.dest_type.to_token_stream().to_string()
-                )
-            })
-            .unwrap();
+        let mapping = StructToStructMapping::new(
+            self.mapping.source_type.clone(),
+            self.mapping.dest_type.clone(),
+            ctx,
+        )
+        .expect("create struct to struct mapping");
 
-        dbg!(&source, &dest);
-        unimplemented!()
+        let fn_name = self.iden.clone();
+        let value_ty = self.mapping.source_type.clone();
+        let dest_ty = self.mapping.dest_type.clone();
+
+        tokens.extend(quote! {
+            fn #fn_name(value: #value_ty) -> #dest_ty {
+                #mapping
+            }
+            #mapping
+        });
     }
-}
-
-struct StructMapping {
-    source_path: syn::Path,
-    dest_path: syn::Path,
 }
 
 /// Returns the root path of the crate that calls this function.

@@ -14,13 +14,16 @@ struct DestStruct {
 
 #[test]
 fn basic_struct() {
+    use crate::v2;
     let input = SourceStruct {
         a: 1,
         b: 2,
         s: "hello".to_string(),
     };
+
+    //TODO: support for `create::*` syntax
     automapper::map! {
-        fn mapping(usage::v2::SourceStruct, usage::v2::DestStruct);
+        fn mapping(v2::SourceStruct, v2::DestStruct);
     };
     let output = mapping(input.clone());
 }
