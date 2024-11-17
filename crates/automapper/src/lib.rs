@@ -94,6 +94,7 @@ impl ToTokens for TraitImpl {
 
         let mapping = StructToStructMapping::new(
             self.mapping.source_type.clone(),
+            vec!["value".to_string()], // the name of the input variable in the mapping function
             self.mapping.dest_type.clone(),
             ctx,
         )
@@ -108,7 +109,9 @@ impl ToTokens for TraitImpl {
                 #mapping
             }
         };
-        dbg!(t.to_string());
+
+        #[cfg(debug_assertions)]
+        std::fs::write("output.rs", t.to_string()).expect("write to output.rs");
 
         tokens.extend(t);
     }

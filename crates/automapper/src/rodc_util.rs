@@ -21,6 +21,14 @@ pub fn find_struct_by_exact_name(name: &syn::Path, rdocs: &Crate) -> anyhow::Res
         })
 }
 
+pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
+    let dc = rdocs.paths.get(id).unwrap();
+    let rustdoc_types::ItemKind::Struct = &dc.kind else {
+        unreachable!("path must be a struct type")
+    };
+    syn::parse_str(&dc.path.join("::")).expect("failed to parse path")
+}
+
 /// Find structs by name.
 ///
 /// This function will return a list of structs that match the given name partially or exactly.
@@ -173,6 +181,39 @@ pub struct StructField {
 pub enum StructFieldKind {
     Primitive { name: String },
     ResolvedPath { path: rustdoc_types::Path },
+}
+
+impl StructFieldKind {
+    pub fn as_str(&self) -> &str {
+        match self {
+            StructFieldKind::Primitive { name } => name,
+            StructFieldKind::ResolvedPath { path } => &path.name,
+        }
+    }
+    pub fn is_same_kind(&self, other: &StructFieldKind) -> bool {
+        match (self, other) {
+            (StructFieldKind::Primitive { .. }, StructFieldKind::Primitive { .. }) => true,
+            (StructFieldKind::ResolvedPath { .. }, StructFieldKind::ResolvedPath { .. }) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_primitive(&self) -> bool {
+        matches!(self, StructFieldKind::Primitive { .. })
+    }
+
+    pub fn is_resolved_path(&self) -> bool {
+        matches!(self, StructFieldKind::ResolvedPath { .. })
+    }
+
+    pub fn is_primitive_eq(&self, other: &StructFieldKind) -> bool {
+        match (self, other) {
+            (StructFieldKind::Primitive { name: a }, StructFieldKind::Primitive { name: b }) => {
+                a == b
+            }
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]

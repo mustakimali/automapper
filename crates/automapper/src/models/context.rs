@@ -1,5 +1,6 @@
 use std::{ops::Deref, rc::Rc};
 
+#[derive(Clone)]
 pub struct MacroCtx {
     inner: Rc<MacroCtxInner>,
 }

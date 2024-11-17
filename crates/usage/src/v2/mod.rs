@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 #[derive(Debug, Clone)]
 struct SourceStruct {
     a: i32,
