@@ -45,6 +45,11 @@ struct DestStruct2 {
     s: String,
     nested: DestStruct,
 }
+#[derive(Debug, Clone)]
+struct DestStruct3 {
+    s: String,
+    nested: DestStruct,
+}
 
 #[test]
 fn nested_struct() {
@@ -63,6 +68,7 @@ fn nested_struct() {
     // };
     // let output = mapping(input.clone());
     automapper::map!(v2::SourceStruct2, v2::DestStruct2);
+    automapper::map!(v2::SourceStruct2, v2::DestStruct3);
     let output = input.clone().map_to();
 
     assert_eq!(input.s, output.s);
