@@ -103,12 +103,14 @@ impl ToTokens for TraitImpl {
         let value_ty = self.mapping.source_type.clone();
         let dest_ty = self.mapping.dest_type.clone();
 
-        tokens.extend(quote! {
+        let t = quote! {
             fn #fn_name(value: #value_ty) -> #dest_ty {
                 #mapping
             }
-            #mapping
-        });
+        };
+        dbg!(t.to_string());
+
+        tokens.extend(t);
     }
 }
 

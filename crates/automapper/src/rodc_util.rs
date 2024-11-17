@@ -134,14 +134,24 @@ fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFie
 
 #[derive(Debug, Clone)]
 pub struct StructWrapper {
-    is_exact_match: bool,
-    path: Vec<String>,
-    kind: StructKind,
+    pub is_exact_match: bool,
+    pub path: Vec<String>,
+    pub kind: StructKind,
 }
 
 impl StructWrapper {
     pub fn name(&self) -> &str {
         self.path.last().expect("name")
+    }
+    pub fn path(&self) -> syn::Path {
+        let s = self
+            .path
+            .clone()
+            .into_iter()
+            .skip(1) // TODO(FIX): Skip the crate name
+            .collect::<Vec<_>>()
+            .join("::");
+        syn::parse_str(&s).expect("parse path")
     }
 }
 
@@ -155,8 +165,8 @@ pub enum StructKind {
 #[derive(Debug, Clone)]
 pub struct StructField {
     /// Unset for tuple fields
-    name: Option<String>,
-    kind: StructFieldKind,
+    pub name: Option<String>,
+    pub kind: StructFieldKind,
 }
 
 #[derive(Debug, Clone)]
