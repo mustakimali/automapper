@@ -3,5 +3,5 @@
 
 ## To Do
 - [x] Basic struct + primitive fields
-- [ ] Optional fields
+- [x] Optional fields
 - [ ] Enum mapping

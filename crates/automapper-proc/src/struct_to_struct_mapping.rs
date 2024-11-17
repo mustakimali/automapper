@@ -1,9 +1,12 @@
+use std::ops::ControlFlow;
+
 use anyhow::Context;
 use quote::{format_ident, quote, ToTokens};
+use rustdoc_types::{GenericArg, GenericArgs};
 
 use crate::{
     models::context::MacroCtx,
-    rodc_util::{self, StructWrapper},
+    rodc_util::{self, StructFieldKind, StructWrapper},
 };
 
 pub struct StructToStructMapping {
@@ -47,6 +50,159 @@ impl StructToStructMapping {
             ctx,
         })
     }
+
+    fn map_struct_plain(
+        &self,
+        source: &StructWrapper,
+        dest_fields: &Vec<rodc_util::StructField>,
+        tokens: &mut proc_macro2::TokenStream,
+        dest_path: syn::Path,
+    ) {
+        let rodc_util::StructKind::Plain {
+            fields: source_fields,
+        } = &source.kind
+        else {
+            panic!("source struct is not plain struct");
+        };
+        let accessor = self
+            .source_accessor
+            .iter()
+            .map(|i| format_ident!("{}", i))
+            .collect::<Vec<_>>();
+        let accessor = quote! { #(#accessor).* };
+
+        let mut mappings = Vec::with_capacity(dest_fields.len());
+        for dest_f in dest_fields.iter() {
+            let Some(map) = self.create_field_mapping(source_fields, dest_f, &accessor) else {
+                continue;
+            };
+            mappings.push(map);
+        }
+
+        tokens.extend(quote! {
+            #dest_path {
+                #(#mappings)*
+            }
+        });
+    }
+
+    fn create_field_mapping(
+        &self,
+        source_fields: &[rodc_util::StructField],
+        dest_field: &rodc_util::StructField,
+        accessor: &proc_macro2::TokenStream,
+    ) -> Option<proc_macro2::TokenStream> {
+        let Some(source_field) = source_fields.iter().find(|f| f.name == dest_field.name) else {
+            panic!(
+                "failed to find matching source field for dest field: {}",
+                dest_field.name.clone().unwrap_or_default() // must be Some(_) for Plain struct fields
+            );
+        };
+        let dest_f_name = format_ident!("{}", dest_field.name.clone().unwrap_or_default());
+        let source_f_name = format_ident!("{}", source_field.name.clone().unwrap_or_default());
+        if !dest_field.kind.is_same_kind(&source_field.kind) {
+            panic!(
+                "source and dest fields are not of the same kind: {} and {}",
+                dest_field.kind.as_str(),
+                source_field.kind.as_str()
+            );
+        }
+
+        match &dest_field.kind {
+            rodc_util::StructFieldKind::Primitive { name: _ } => {
+                if dest_field.kind.is_primitive_eq(&source_field.kind) {
+                    // primitive types: can be directly assigned
+
+                    return Some(quote! {
+                        #dest_f_name: #accessor.#source_f_name, /* primative type */
+                    });
+                } else {
+                    // primitive types: may require explicit casting
+                    //TODO(FIX): only castable types
+                    return Some(quote! {
+                        #dest_f_name: #accessor.#source_f_name as _, /* primative type with casting */
+                    });
+                }
+            }
+            rodc_util::StructFieldKind::ResolvedPath { path: dest_path } => {
+                let rodc_util::StructFieldKind::ResolvedPath { path: source_path } =
+                    &source_field.kind
+                else {
+                    unreachable!("must be resolved path")
+                };
+
+                // Possiblity: Option<T> or Result<T, E>
+                //
+                //
+                if StructFieldKind::are_both_option_type(&source_field.kind, &dest_field.kind) {
+                    let source_t_of_option = source_field.t_of_option().unwrap();
+                    let dest_t_of_option = dest_field.t_of_option().unwrap();
+
+                    let struct_mapping_inside_lambda = StructToStructMapping::new(
+                        rodc_util::find_path_by_id(&source_t_of_option.id, &self.ctx.rdocs),
+                        vec!["v".to_string()],
+                        rodc_util::find_path_by_id(&dest_t_of_option.id, &self.ctx.rdocs),
+                        self.ctx.clone(),
+                    )
+                    .with_context(|| {
+                        format!(
+                            "failed to create mapping for source: {} and dest: {}",
+                            source_field.name.clone().unwrap_or_default(),
+                            dest_field.name.clone().unwrap_or_default()
+                        )
+                    })
+                    .unwrap();
+
+                    return Some(quote! {
+                        #dest_f_name: #accessor.#source_f_name.map(|v| {
+                            #struct_mapping_inside_lambda
+                        }),
+                    });
+                }
+
+                // Possiblity: Same type with different generic arg
+                //
+                //
+                // TODO: error
+
+                // Possiblity: Same type of struct to struct mapping (non generic)
+                //
+                if dest_path.id == source_path.id {
+                    // same path: can be directly assigned
+                    return Some(quote! {
+                        #dest_f_name: #accessor.#source_f_name, /* primative type */
+                    });
+                }
+
+                // Possiblity: Other types (with possibly similar fields)
+                //
+                //
+                let new_source_accessor = {
+                    let mut s = self.source_accessor.clone();
+                    s.push(source_f_name.to_string());
+                    s
+                };
+                let struct_mapping = StructToStructMapping::new(
+                    rodc_util::find_path_by_id(&source_path.id, &self.ctx.rdocs),
+                    new_source_accessor,
+                    rodc_util::find_path_by_id(&dest_path.id, &self.ctx.rdocs),
+                    self.ctx.clone(),
+                )
+                .with_context(|| {
+                    format!(
+                        "failed to create mapping for source: {} and dest: {}",
+                        source_field.name.clone().unwrap_or_default(),
+                        dest_field.name.clone().unwrap_or_default()
+                    )
+                })
+                .unwrap();
+
+                return Some(quote! {
+                    #dest_f_name: #struct_mapping,
+                });
+            }
+        }
+    }
 }
 
 impl ToTokens for StructToStructMapping {
@@ -63,107 +219,10 @@ impl ToTokens for StructToStructMapping {
                 });
             }
             rodc_util::StructKind::Tuple(_vec) => todo!(),
-            rodc_util::StructKind::Plain { fields } => {
-                let rodc_util::StructKind::Plain {
-                    fields: source_fields,
-                } = &source.kind
-                else {
-                    panic!("source struct is not plain struct");
-                };
-                let accessor = self
-                    .source_accessor
-                    .iter()
-                    .map(|i| format_ident!("{}", i))
-                    .collect::<Vec<_>>();
-                let accessor = quote! { #(#accessor).* };
-
-                let mut mappings = Vec::with_capacity(fields.len());
-                for dest_f in fields.iter() {
-                    let Some(matching_source_f) =
-                        source_fields.iter().find(|f| f.name == dest_f.name)
-                    else {
-                        panic!(
-                            "failed to find matching source field for dest field: {}",
-                            dest_f.name.clone().unwrap_or_default() // must be Some(_) for Plain struct fields
-                        );
-                    };
-
-                    let dest_f_name = format_ident!("{}", dest_f.name.clone().unwrap_or_default());
-                    let source_f_name =
-                        format_ident!("{}", matching_source_f.name.clone().unwrap_or_default());
-
-                    if !dest_f.kind.is_same_kind(&matching_source_f.kind) {
-                        panic!(
-                            "source and dest fields are not of the same kind: {} and {}",
-                            dest_f.kind.as_str(),
-                            matching_source_f.kind.as_str()
-                        );
-                    }
-
-                    match &dest_f.kind {
-                        rodc_util::StructFieldKind::Primitive { name: _ } => {
-                            if dest_f.kind.is_primitive_eq(&matching_source_f.kind) {
-                                // primitive types: can be directly assigned
-
-                                mappings.push(quote! {
-                                    #dest_f_name: #accessor.#source_f_name, /* primative type */
-                                });
-                            } else {
-                                // primitive types: may require explicit casting
-                                //TODO(FIX): only castable types
-                                mappings.push(quote! {
-                                    #dest_f_name: #accessor.#source_f_name as _, /* primative type with casting */
-                                });
-                            }
-                        }
-                        rodc_util::StructFieldKind::ResolvedPath { path: dest_path } => {
-                            let rodc_util::StructFieldKind::ResolvedPath { path: source_path } =
-                                &matching_source_f.kind
-                            else {
-                                unreachable!("must be resolved path")
-                            };
-
-                            if dest_path.id == source_path.id {
-                                // same path: can be directly assigned
-                                mappings.push(quote! {
-                                    #dest_f_name: #accessor.#source_f_name, /* primative type */
-                                });
-                                continue;
-                            }
-
-                            // resolve_path
-                            let new_source_accessor = {
-                                let mut s = self.source_accessor.clone();
-                                s.push(source_f_name.to_string());
-                                s
-                            };
-                            let struct_mapping = StructToStructMapping::new(
-                                rodc_util::find_path_by_id(&source_path.id, &self.ctx.rdocs),
-                                new_source_accessor,
-                                rodc_util::find_path_by_id(&dest_path.id, &self.ctx.rdocs),
-                                self.ctx.clone(),
-                            )
-                            .with_context(|| {
-                                format!(
-                                    "failed to create mapping for source: {} and dest: {}",
-                                    matching_source_f.name.clone().unwrap_or_default(),
-                                    dest_f.name.clone().unwrap_or_default()
-                                )
-                            })
-                            .unwrap();
-
-                            mappings.push(quote! {
-                                #dest_f_name: #struct_mapping,
-                            });
-                        }
-                    }
-                }
-
-                tokens.extend(quote! {
-                    #dest_path {
-                        #(#mappings)*
-                    }
-                });
+            rodc_util::StructKind::Plain {
+                fields: dest_fields,
+            } => {
+                self.map_struct_plain(source, dest_fields, tokens, dest_path);
             }
         }
     }

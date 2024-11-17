@@ -62,7 +62,7 @@ pub fn enumerate_rust_types<'a>(
                 fields: struct_
                     .field_ids
                     .iter()
-                    .flat_map(|id| all_fields.get(&id).cloned())
+                    .flat_map(|id| all_fields.get(id).cloned())
                     .collect(),
                 fq_path: FqIdent::try_from_str(&struct_.name)
                     .ok()
@@ -122,12 +122,11 @@ fn parse_struct(rustdoc: &Value) -> anyhow::Result<Struct> {
         .as_array()
         .context("cast .inner.struct.kind.plain.fields as array")?
         .iter()
-        .map(|f| {
+        .flat_map(|f| {
             f.as_str()
                 .map(|s| s.to_string())
                 .or_else(|| f.as_u64().map(|u| u.to_string()))
         })
-        .flatten()
         .map(Id::from)
         .collect::<Vec<_>>();
     Ok(Struct {
@@ -142,12 +141,11 @@ fn parse_enum(rustdoc: &Value) -> anyhow::Result<Enum> {
         .as_array()
         .context("cast .inner.struct.kind.plain.fields as array")?
         .iter()
-        .map(|f| {
+        .flat_map(|f| {
             f.as_str()
                 .map(|s| s.to_string())
                 .or_else(|| f.as_u64().map(|u| u.to_string()))
         })
-        .flatten()
         .map(Id::from)
         .collect::<Vec<_>>();
     Ok(Enum {

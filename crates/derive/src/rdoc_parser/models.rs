@@ -64,11 +64,11 @@ impl RustType {
     }
 
     pub fn same_kind(&self, other: &Self) -> bool {
-        match (self, other) {
-            (RustType::Struct { .. }, RustType::Struct { .. }) => true,
-            (RustType::Enum { .. }, RustType::Enum { .. }) => true,
-            _ => false,
-        }
+        matches!(
+            (self, other),
+            (RustType::Struct { .. }, RustType::Struct { .. })
+                | (RustType::Enum { .. }, RustType::Enum { .. })
+        )
     }
 
     pub fn kind(&self) -> &str {
@@ -176,7 +176,7 @@ impl ResolvedPathExt for ResolvedPathStructField {
 impl ResolvedPathExt for StructFieldKind {
     fn name_ident(&self) -> FqIdent {
         match self {
-            StructFieldKind::Primitive(n) => FqIdent::try_from_str(&n).expect("n"),
+            StructFieldKind::Primitive(name) => FqIdent::try_from_str(name).expect("n"),
             StructFieldKind::ResolvedPath(path) => path.name_ident(),
         }
     }

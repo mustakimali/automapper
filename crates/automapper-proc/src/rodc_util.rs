@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Context};
 use quote::ToTokens;
-use rustdoc_types::{Crate, Item, ItemSummary};
+use rustdoc_types::{Crate, GenericArg, GenericArgs, Item, ItemSummary};
 
 //
 // Public
@@ -183,6 +183,40 @@ pub enum StructFieldKind {
     ResolvedPath { path: rustdoc_types::Path },
 }
 
+impl StructField {
+    pub fn t_of_option(&self) -> anyhow::Result<&rustdoc_types::Path> {
+        let StructFieldKind::ResolvedPath { path: source_path } = &self.kind else {
+            anyhow::bail!("must be a resolved path")
+        };
+
+        let Some(generic_args) = &source_path.args else {
+            anyhow::bail!("unreachable(BUG): must have args");
+        };
+        let GenericArgs::AngleBracketed {
+            args,
+            constraints: _,
+        } = generic_args.as_ref()
+        else {
+            dbg!(generic_args);
+
+            anyhow::bail!("unimplemented: Option type of parentized argument")
+        };
+        let Some(GenericArg::Type(ty)) = args.iter().next() else {
+            dbg!(generic_args);
+
+            anyhow::bail!("unimplemented: Option type with infered, const or lifetype argument")
+        };
+
+        let rustdoc_types::Type::ResolvedPath(path) = ty else {
+            dbg!(generic_args);
+
+            anyhow::bail!("unimplemented: Option type with touple value: Option<(,)>")
+        };
+
+        Ok(path)
+    }
+}
+
 impl StructFieldKind {
     pub fn as_str(&self) -> &str {
         match self {
@@ -194,6 +228,16 @@ impl StructFieldKind {
         match (self, other) {
             (StructFieldKind::Primitive { .. }, StructFieldKind::Primitive { .. }) => true,
             (StructFieldKind::ResolvedPath { .. }, StructFieldKind::ResolvedPath { .. }) => true,
+            _ => false,
+        }
+    }
+
+    pub fn are_both_option_type(item1: &StructFieldKind, item2: &StructFieldKind) -> bool {
+        match (item1, item2) {
+            (
+                StructFieldKind::ResolvedPath { path: p1 },
+                StructFieldKind::ResolvedPath { path: p2 },
+            ) => p1.name.clone() == "Option" && p2.name == "Option",
             _ => false,
         }
     }
