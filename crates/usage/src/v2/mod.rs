@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use automapper::AutoMapsTo;
+use automapper::{AutoMapsFrom, AutoMapsTo};
 
 #[derive(Debug, Clone)]
 struct SourceStruct {
@@ -69,7 +69,9 @@ fn nested_struct() {
     // let output = mapping(input.clone());
     automapper::map!(v2::SourceStruct2, v2::DestStruct2);
     automapper::map!(v2::SourceStruct2, v2::DestStruct3);
-    let output = input.clone().map_to();
+
+    let output: v2::DestStruct2 = input.clone().map_to();
+    let output_2 = v2::DestStruct2::map_from(input.clone());
 
     assert_eq!(input.s, output.s);
     assert_eq!(input.nested.a, output.nested.a);
