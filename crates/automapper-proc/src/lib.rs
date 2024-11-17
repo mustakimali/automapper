@@ -32,7 +32,7 @@ struct TraitImpl {
 #[derive(Debug, Clone)]
 struct Request {
     source_type: syn::Path,
-    _coma: syn::Token![,],
+    _coma: syn::Token![->],
     dest_type: syn::Path,
 }
 

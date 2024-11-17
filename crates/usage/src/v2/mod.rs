@@ -64,7 +64,7 @@ fn nested_struct() {
     };
 
     // automapper::map! {
-    //     fn mapping(v2::SourceStruct2, v2::DestStruct2);
+    //     fn mapping(v2::SourceStruct2 -> v2::DestStruct2);
     // };
     // let output = mapping(input.clone());
     automapper::map!(v2::SourceStruct2, v2::DestStruct2);
