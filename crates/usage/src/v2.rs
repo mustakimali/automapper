@@ -6,21 +6,25 @@ use models::*;
 
 mod models;
 
-#[test]
-fn basic_struct() {
-    let input = SourceStruct {
-        a: 1,
-        b: 2,
-        s: "hello".to_string(),
-    };
+mod tests {
+    use automapper::{AutoMapsFrom, AutoMapsTo};
 
-    //TODO: support for `create::*` syntax
-    automapper::map!(SourceStruct, DestStruct);
-    let output = input.clone().map_to();
+    #[test]
+    fn basic_struct() {
+        use crate::v2::models;
+        let input = crate::v2::SourceStruct {
+            a: 1,
+            b: 2,
+            s: "hello".to_string(),
+        };
 
-    assert_eq!(input.a, output.a);
-    assert_eq!(input.b, output.b);
-    assert_eq!(input.s, output.s);
+        automapper::map!(models::SourceStruct, models::DestStruct);
+        let output = input.clone().map_to();
+
+        assert_eq!(input.a, output.a);
+        assert_eq!(input.b, output.b);
+        assert_eq!(input.s, output.s);
+    }
 }
 
 #[test]

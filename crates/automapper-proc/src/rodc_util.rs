@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Context};
-use quote::ToTokens;
+use quote::{format_ident, ToTokens};
 use rustdoc_types::{Crate, GenericArg, GenericArgs, Item, ItemSummary};
 
 //
@@ -36,11 +36,15 @@ pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
 ///
 pub fn find_struct_by_name(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<StructWrapper>> {
     let matching_structs = {
-        let segments = name
+        let mut segments = name
             .segments
             .iter()
             .map(|s| s.ident.to_string())
             .collect::<Vec<_>>();
+
+        if segments.get(0).ok_or(anyhow!("empty name"))?.as_str() == "crate" {
+            segments.remove(0);
+        }
 
         rdocs
             .paths
@@ -108,6 +112,7 @@ fn _find_struct_with_resolved_fields(
 
     Ok(StructWrapper {
         is_exact_match: *exact_match,
+        is_root_crate: item.crate_id == 0,
         path: path_entry.path.clone(),
         kind,
     })
@@ -143,6 +148,7 @@ fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFie
 #[derive(Debug, Clone)]
 pub struct StructWrapper {
     pub is_exact_match: bool,
+    is_root_crate: bool,
     pub path: Vec<String>,
     pub kind: StructKind,
 }
@@ -152,14 +158,17 @@ impl StructWrapper {
         self.path.last().expect("name")
     }
     pub fn path(&self) -> syn::Path {
-        let s = self
+        let mut segments = self
             .path
             .clone()
             .into_iter()
-            .skip(1) // TODO(FIX): Skip the crate name
-            .collect::<Vec<_>>()
-            .join("::");
-        syn::parse_str(&s).expect("parse path")
+            .skip(if self.is_root_crate { 1 } else { 0 }) // TODO(FIX): Skip the crate name
+            .collect::<Vec<_>>();
+        if self.is_root_crate {
+            segments.insert(0, "crate".to_string());
+        }
+        let segments = segments.join("::");
+        syn::parse_str(&segments).expect("parse path")
     }
 }
 
