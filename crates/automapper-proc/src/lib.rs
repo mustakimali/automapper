@@ -101,8 +101,8 @@ impl ToTokens for TraitImpl {
         .expect("create struct to struct mapping");
 
         let fn_name = self.iden.clone();
-        let value_ty = self.mapping.source_type.clone();
-        let dest_ty = self.mapping.dest_type.clone();
+        let value_ty = mapping.source.path();
+        let dest_ty = mapping.dest.path();
 
         let t = quote! {
             fn #fn_name(value: #value_ty) -> #dest_ty {

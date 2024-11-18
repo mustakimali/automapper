@@ -1,4 +1,5 @@
-fn __map(value : SourceStruct3) -> DestStruct4
+fn __map(value : crate :: v2 :: models :: SourceStruct3) -> crate :: v2 ::
+models :: DestStruct4
 {
     crate :: v2 :: models :: DestStruct4
     {

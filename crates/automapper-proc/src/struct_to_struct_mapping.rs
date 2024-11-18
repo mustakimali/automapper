@@ -10,11 +10,11 @@ use crate::{
 };
 
 pub struct StructToStructMapping {
-    source: StructWrapper,
+    pub source: StructWrapper,
     /// The path to the accessor function for the source struct.
     /// Starting from `value` in the root mapping function.
     source_accessor: Vec<String>,
-    dest: StructWrapper,
+    pub dest: StructWrapper,
     ctx: MacroCtx,
 }
 
