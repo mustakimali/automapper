@@ -2,20 +2,9 @@
 
 use crate::v2;
 use automapper::{AutoMapsFrom, AutoMapsTo};
+use models::*;
 
-#[derive(Debug, Clone)]
-struct SourceStruct {
-    a: i32,
-    b: u32,
-    s: String,
-}
-
-#[derive(Debug, Clone)]
-struct DestStruct {
-    a: i32,
-    b: u32,
-    s: String,
-}
+mod models;
 
 #[test]
 fn basic_struct() {
@@ -26,29 +15,12 @@ fn basic_struct() {
     };
 
     //TODO: support for `create::*` syntax
-    automapper::map!(v2::SourceStruct, v2::DestStruct);
+    automapper::map!(SourceStruct, DestStruct);
     let output = input.clone().map_to();
 
     assert_eq!(input.a, output.a);
     assert_eq!(input.b, output.b);
     assert_eq!(input.s, output.s);
-}
-
-#[derive(Debug, Clone)]
-struct SourceStruct2 {
-    s: String,
-    nested: SourceStruct,
-}
-
-#[derive(Debug, Clone)]
-struct DestStruct2 {
-    s: String,
-    nested: DestStruct,
-}
-#[derive(Debug, Clone)]
-struct DestStruct3 {
-    s: String,
-    nested: DestStruct,
 }
 
 #[test]
@@ -66,8 +38,8 @@ fn nested_struct() {
     //     fn mapping(v2::SourceStruct2 -> v2::DestStruct2);
     // };
     // let output = mapping(input.clone());
-    automapper::map!(v2::SourceStruct2, v2::DestStruct2);
-    automapper::map!(v2::SourceStruct2, v2::DestStruct3);
+    automapper::map!(SourceStruct2, DestStruct2);
+    automapper::map!(SourceStruct2, DestStruct3);
 
     let output: v2::DestStruct2 = input.clone().map_to();
     let output_2 = v2::DestStruct2::map_from(input.clone());
@@ -76,20 +48,6 @@ fn nested_struct() {
     assert_eq!(input.nested.a, output.nested.a);
     assert_eq!(input.nested.b, output.nested.b);
     assert_eq!(input.nested.s, output.nested.s);
-}
-
-#[derive(Debug, Clone)]
-struct SourceStruct3 {
-    s: String,
-    nested: SourceStruct,
-    optional: Option<SourceStruct>,
-}
-
-#[derive(Debug, Clone)]
-struct DestStruct4 {
-    s: String,
-    nested: DestStruct,
-    optional: Option<DestStruct>,
 }
 
 #[test]
@@ -108,7 +66,7 @@ fn optional_fields() {
         }),
     };
 
-    automapper::map!(v2::SourceStruct3, v2::DestStruct4);
+    automapper::map!(SourceStruct3, DestStruct4);
     let output = input.clone().map_to();
 
     assert_eq!(input.s, output.s);
