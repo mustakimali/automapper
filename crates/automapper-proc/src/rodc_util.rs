@@ -1,13 +1,16 @@
 use anyhow::{anyhow, bail, Context};
 use quote::{format_ident, ToTokens};
 use rustdoc_types::{Crate, GenericArg, GenericArgs, Item, ItemSummary};
+use search::SearchResult;
+
+mod search;
 
 //
 // Public
 //
 
 pub fn find_struct_by_exact_name(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<StructWrapper> {
-    let items = find_struct_by_name(name, rdocs)?;
+    let items = query_structs(name, rdocs)?;
     items
         .iter()
         .find(|i| i.is_exact_match)
@@ -24,9 +27,13 @@ pub fn find_struct_by_exact_name(name: &syn::Path, rdocs: &Crate) -> anyhow::Res
 pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
     let dc = rdocs.paths.get(id).unwrap();
     let rustdoc_types::ItemKind::Struct = &dc.kind else {
-        unreachable!("path must be a struct type")
+        unreachable!("find_path_by_id: path must be a struct type")
     };
     syn::parse_str(&dc.path.join("::")).expect("failed to parse path")
+}
+
+pub fn query_enums(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<EnumWrapper>> {
+    todo!()
 }
 
 /// Find structs by name.
@@ -34,41 +41,12 @@ pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
 /// This function will return a list of structs that match the given name partially or exactly.
 /// Check the [StructWrapper::is_exact_match] field to see if the match was exact or not.
 ///
-pub fn find_struct_by_name(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<StructWrapper>> {
-    let matching_structs = {
-        let mut segments = name
-            .segments
-            .iter()
-            .map(|s| s.ident.to_string())
-            .collect::<Vec<_>>();
-
-        if segments.get(0).ok_or(anyhow!("empty name"))?.as_str() == "crate" {
-            segments.remove(0);
-        }
-
-        rdocs
-            .paths
-            .iter()
-            .find(|(_, p)| p.path == segments)
-            .map(|(id, m)| vec![(true, id, m)])
-            .or_else(|| {
-                Some(
-                    rdocs
-                        .paths
-                        .iter()
-                        .filter(|(_, p)| p.path.ends_with(&segments))
-                        .map(|(id, m)| (false, id, m))
-                        .collect::<Vec<_>>(),
-                )
-            })
-    }
-    .context("find struct by name")?;
-
-    matching_structs
-        .iter()
-        .map(|(exact_match, path_entry_id, path_entry)| {
-            _find_struct_with_resolved_fields(path_entry, rdocs, path_entry_id, exact_match)
-        })
+pub fn query_structs(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<StructWrapper>> {
+    search::query_items(name, rdocs)
+        .context("find struct by name")?
+        .into_iter()
+        .filter(|i| matches!(i.item.kind, rustdoc_types::ItemKind::Struct))
+        .map(|result| _find_struct_with_resolved_fields(&result, rdocs))
         .collect::<anyhow::Result<Vec<_>>>()
 }
 
@@ -77,23 +55,21 @@ pub fn find_struct_by_name(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Ve
 //
 
 fn _find_struct_with_resolved_fields(
-    path_entry: &&ItemSummary,
+    result: &SearchResult,
     rdocs: &Crate,
-    path_entry_id: &&rustdoc_types::Id,
-    exact_match: &bool,
 ) -> Result<StructWrapper, anyhow::Error> {
-    let rustdoc_types::ItemKind::Struct = path_entry.kind else {
+    let rustdoc_types::ItemKind::Struct = result.item.kind else {
         bail!("not a struct type")
     };
 
     let (_, item) = rdocs
         .index
         .iter()
-        .find(|(_, item)| item.id.eq(path_entry_id))
+        .find(|(_, item)| item.id.eq(&result.id))
         .context("locate struct in .index")?;
 
     let rustdoc_types::ItemEnum::Struct(struct_) = &item.inner else {
-        unreachable!("must be a struct type",)
+        unreachable!("_find_struct_with_resolved_fields: must be a struct type",)
     };
 
     let kind = match &struct_.kind {
@@ -111,9 +87,9 @@ fn _find_struct_with_resolved_fields(
     };
 
     Ok(StructWrapper {
-        is_exact_match: *exact_match,
+        is_exact_match: result.exact_match,
         is_root_crate: item.crate_id == 0,
-        path: path_entry.path.clone(),
+        path: result.item.path.clone(),
         kind,
     })
 }
@@ -124,7 +100,7 @@ fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFie
         .flat_map(|id| rdocs.index.get(id))
         .map(|item| {
             let rustdoc_types::ItemEnum::StructField(ty) = &item.inner else {
-                unreachable!("must be a struct field")
+                unreachable!("_resolve_fields: must be a struct field")
             };
 
             let kind = match ty {
@@ -143,6 +119,21 @@ fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFie
             }
         })
         .collect::<Vec<_>>()
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumWrapper {
+    pub is_exact_match: bool,
+    is_root_crate: bool,
+    pub path: Vec<String>,
+    pub kind: EnumKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum EnumKind {
+    Unit,
+    Tuple(Vec<StructField>),
+    Plain { fields: Vec<StructField> },
 }
 
 #[derive(Debug, Clone)]
@@ -278,11 +269,11 @@ mod test {
     #[test]
     fn find_struct() {
         let rdoc = get_test_data();
-        let struct_ = find_struct_by_name(format_ident!("Test").into(), &rdoc).unwrap();
+        let struct_ = query_structs(format_ident!("Test").into(), &rdoc).unwrap();
         assert_eq!(struct_.len(), 1);
         assert!(!struct_[0].is_exact_match);
 
-        let struct_ = find_struct_by_name(syn::parse_str("usage::Test").unwrap(), &rdoc).unwrap();
+        let struct_ = query_structs(syn::parse_str("usage::Test").unwrap(), &rdoc).unwrap();
         assert_eq!(struct_.len(), 1);
         assert!(struct_[0].is_exact_match);
     }
