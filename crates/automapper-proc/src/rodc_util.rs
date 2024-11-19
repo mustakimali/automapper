@@ -14,14 +14,9 @@ pub fn find_struct_by_exact_name(name: &syn::Path, rdocs: &Crate) -> anyhow::Res
     items
         .iter()
         .find(|i| i.is_exact_match)
-        .or_else(|| items.iter().next())
+        .or_else(|| items.first())
         .cloned()
-        .with_context(|| {
-            format!(
-                "failed to find struct: {}",
-                name.to_token_stream().to_string()
-            )
-        })
+        .with_context(|| format!("failed to find struct: {}", name.to_token_stream()))
 }
 
 pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
@@ -32,8 +27,13 @@ pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
     syn::parse_str(&dc.path.join("::")).expect("failed to parse path")
 }
 
-pub fn query_enums(_name: &syn::Path, _rdocs: &Crate) -> anyhow::Result<Vec<EnumWrapper>> {
-    todo!()
+pub fn query_enums(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<EnumWrapper>> {
+    search::query_items(name, rdocs)
+        .context("find struct by name")?
+        .into_iter()
+        .filter(|i| matches!(i.item.kind, rustdoc_types::ItemKind::Struct))
+        .map(|result| _find_enum_with_resolved_variants(&result, rdocs))
+        .collect::<anyhow::Result<Vec<_>>>()
 }
 
 /// Find structs by name.
@@ -54,6 +54,66 @@ pub fn query_structs(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<Stru
 // Private
 //
 
+fn _find_enum_with_resolved_variants(
+    result: &SearchResult,
+    rdocs: &Crate,
+) -> Result<EnumWrapper, anyhow::Error> {
+    let rustdoc_types::ItemKind::Enum = result.item.kind else {
+        bail!("not an enum type")
+    };
+
+    let (_, item) = rdocs
+        .index
+        .iter()
+        .find(|(_, item)| item.id.eq(result.id))
+        .context("locate struct in .index")?;
+
+    let rustdoc_types::ItemEnum::Enum(enum_) = &item.inner else {
+        unreachable!("_find_enum_with_resolved_variants: must be a struct type",)
+    };
+
+    let variants = enum_
+        .variants
+        .iter()
+        .flat_map(|v| rdocs.index.get(v))
+        .map(|e| {
+            let rustdoc_types::ItemEnum::Variant(ref variant) = e.inner else {
+                unreachable!("variant must be a variant type")
+            };
+
+            match &variant.kind {
+                rustdoc_types::VariantKind::Plain => EnumVariant {
+                    name: e.name.clone().expect("name of enum variant"),
+                    kind: EnumVariantKind::Plain,
+                },
+                rustdoc_types::VariantKind::Tuple(items) => EnumVariant {
+                    name: e.name.clone().expect("name of enum variant"),
+                    kind: EnumVariantKind::Tuple(_resolve_fields(
+                        rdocs,
+                        items.iter().flatten().copied().collect::<Vec<_>>().as_ref(),
+                    )),
+                },
+                rustdoc_types::VariantKind::Struct {
+                    fields,
+                    has_stripped_fields: _,
+                } => EnumVariant {
+                    name: e.name.clone().expect("name of enum variant"),
+                    kind: EnumVariantKind::Struct {
+                        fields: _resolve_fields(rdocs, fields),
+                    },
+                },
+            }
+        })
+        .collect::<Vec<_>>();
+
+    Ok(EnumWrapper {
+        is_exact_match: result.exact_match,
+        is_root_crate: item.crate_id == 0,
+        path: result.item.path.clone(),
+        variants,
+    })
+}
+
 fn _find_struct_with_resolved_fields(
     result: &SearchResult,
     rdocs: &Crate,
@@ -65,7 +125,7 @@ fn _find_struct_with_resolved_fields(
     let (_, item) = rdocs
         .index
         .iter()
-        .find(|(_, item)| item.id.eq(&result.id))
+        .find(|(_, item)| item.id.eq(result.id))
         .context("locate struct in .index")?;
 
     let rustdoc_types::ItemEnum::Struct(struct_) = &item.inner else {
@@ -76,13 +136,13 @@ fn _find_struct_with_resolved_fields(
         rustdoc_types::StructKind::Unit => StructKind::Unit,
         rustdoc_types::StructKind::Tuple(vec) => StructKind::Tuple(_resolve_fields(
             rdocs,
-            &vec.iter().flatten().map(|c| c.clone()).collect::<Vec<_>>(),
+            &vec.iter().flatten().copied().collect::<Vec<_>>(),
         )),
         rustdoc_types::StructKind::Plain {
             fields,
             has_stripped_fields: _,
         } => StructKind::Plain {
-            fields: _resolve_fields(rdocs, &fields),
+            fields: _resolve_fields(rdocs, fields),
         },
     };
 
@@ -94,7 +154,7 @@ fn _find_struct_with_resolved_fields(
     })
 }
 
-fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructField> {
+fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFieldOrEnumVariant> {
     fields
         .iter()
         .flat_map(|id| rdocs.index.get(id))
@@ -113,7 +173,7 @@ fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFie
                 _ => unimplemented!("only struct kind plain or resolved path are supported"),
             };
 
-            StructField {
+            StructFieldOrEnumVariant {
                 name: item.name.clone(),
                 kind,
             }
@@ -126,14 +186,22 @@ pub struct EnumWrapper {
     pub is_exact_match: bool,
     is_root_crate: bool,
     pub path: Vec<String>,
-    pub kind: EnumKind,
+    pub variants: Vec<EnumVariant>,
 }
 
 #[derive(Debug, Clone)]
-pub enum EnumKind {
-    Unit,
-    Tuple(Vec<StructField>),
-    Plain { fields: Vec<StructField> },
+pub struct EnumVariant {
+    pub name: String,
+    pub kind: EnumVariantKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum EnumVariantKind {
+    Plain,
+    Tuple(Vec<StructFieldOrEnumVariant>),
+    Struct {
+        fields: Vec<StructFieldOrEnumVariant>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -166,12 +234,14 @@ impl StructWrapper {
 #[derive(Debug, Clone)]
 pub enum StructKind {
     Unit,
-    Tuple(Vec<StructField>),
-    Plain { fields: Vec<StructField> },
+    Tuple(Vec<StructFieldOrEnumVariant>),
+    Plain {
+        fields: Vec<StructFieldOrEnumVariant>,
+    },
 }
 
 #[derive(Debug, Clone)]
-pub struct StructField {
+pub struct StructFieldOrEnumVariant {
     /// Unset for tuple fields
     pub name: Option<String>,
     pub kind: StructFieldKind,
@@ -183,7 +253,7 @@ pub enum StructFieldKind {
     ResolvedPath { path: rustdoc_types::Path },
 }
 
-impl StructField {
+impl StructFieldOrEnumVariant {
     pub fn t_of_option(&self) -> anyhow::Result<&rustdoc_types::Path> {
         let StructFieldKind::ResolvedPath { path: source_path } = &self.kind else {
             anyhow::bail!("must be a resolved path")
@@ -225,11 +295,16 @@ impl StructFieldKind {
         }
     }
     pub fn is_same_kind(&self, other: &StructFieldKind) -> bool {
-        match (self, other) {
-            (StructFieldKind::Primitive { .. }, StructFieldKind::Primitive { .. }) => true,
-            (StructFieldKind::ResolvedPath { .. }, StructFieldKind::ResolvedPath { .. }) => true,
-            _ => false,
-        }
+        matches!(
+            (self, other),
+            (
+                StructFieldKind::Primitive { .. },
+                StructFieldKind::Primitive { .. }
+            ) | (
+                StructFieldKind::ResolvedPath { .. },
+                StructFieldKind::ResolvedPath { .. }
+            )
+        )
     }
 
     pub fn are_both_option_type(item1: &StructFieldKind, item2: &StructFieldKind) -> bool {

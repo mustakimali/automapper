@@ -17,7 +17,7 @@ pub fn query_items<'c>(
         .map(|s| s.ident.to_string())
         .collect::<Vec<_>>();
 
-    if segments.get(0).ok_or(anyhow!("empty name"))?.as_str() == "crate" {
+    if segments.first().ok_or(anyhow!("empty name"))?.as_str() == "crate" {
         segments.remove(0);
     }
 

@@ -29,7 +29,7 @@ impl StructToStructMapping {
             .with_context(|| {
                 format!(
                     "failed to find source struct: {}",
-                    source_path.to_token_stream().to_string()
+                    source_path.to_token_stream()
                 )
             })
             .unwrap();
@@ -38,7 +38,7 @@ impl StructToStructMapping {
             .with_context(|| {
                 format!(
                     "failed to find dest struct: {}",
-                    dest_path.to_token_stream().to_string()
+                    dest_path.to_token_stream()
                 )
             })
             .unwrap();
@@ -54,7 +54,7 @@ impl StructToStructMapping {
     fn map_struct_plain(
         &self,
         source: &StructWrapper,
-        dest_fields: &Vec<rodc_util::StructField>,
+        dest_fields: &[rodc_util::StructFieldOrEnumVariant],
         tokens: &mut proc_macro2::TokenStream,
         dest_path: syn::Path,
     ) {
@@ -88,8 +88,8 @@ impl StructToStructMapping {
 
     fn create_field_mapping(
         &self,
-        source_fields: &[rodc_util::StructField],
-        dest_field: &rodc_util::StructField,
+        source_fields: &[rodc_util::StructFieldOrEnumVariant],
+        dest_field: &rodc_util::StructFieldOrEnumVariant,
         accessor: &proc_macro2::TokenStream,
     ) -> Option<proc_macro2::TokenStream> {
         let Some(source_field) = source_fields.iter().find(|f| f.name == dest_field.name) else {
@@ -113,15 +113,15 @@ impl StructToStructMapping {
                 if dest_field.kind.is_primitive_eq(&source_field.kind) {
                     // primitive types: can be directly assigned
 
-                    return Some(quote! {
+                    Some(quote! {
                         #dest_f_name: #accessor.#source_f_name, /* primative type */
-                    });
+                    })
                 } else {
                     // primitive types: may require explicit casting
                     //TODO(FIX): only castable types
-                    return Some(quote! {
+                    Some(quote! {
                         #dest_f_name: #accessor.#source_f_name as _, /* primative type with casting */
-                    });
+                    })
                 }
             }
             rodc_util::StructFieldKind::ResolvedPath { path: dest_path } => {
@@ -197,9 +197,9 @@ impl StructToStructMapping {
                 })
                 .unwrap();
 
-                return Some(quote! {
+                Some(quote! {
                     #dest_f_name: #struct_mapping,
-                });
+                })
             }
         }
     }

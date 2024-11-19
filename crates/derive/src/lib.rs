@@ -92,7 +92,7 @@ impl ToTokens for TraitImpl {
             .with_context(|| {
                 format!(
                     "failed to find root struct `{}` and resolve fields. Do you need to run the cli to generate rustdoc.json",
-                    self.mapping.source_type.to_token_stream().to_string()
+                    self.mapping.source_type.to_token_stream()
                 )
             })
             .unwrap();
