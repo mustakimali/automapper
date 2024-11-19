@@ -344,11 +344,11 @@ mod test {
     #[test]
     fn find_struct() {
         let rdoc = get_test_data();
-        let struct_ = query_structs(format_ident!("Test").into(), &rdoc).unwrap();
+        let struct_ = query_structs(&format_ident!("Test").into(), &rdoc).unwrap();
         assert_eq!(struct_.len(), 1);
         assert!(!struct_[0].is_exact_match);
 
-        let struct_ = query_structs(syn::parse_str("usage::Test").unwrap(), &rdoc).unwrap();
+        let struct_ = query_structs(&syn::parse_str("usage::Test").unwrap(), &rdoc).unwrap();
         assert_eq!(struct_.len(), 1);
         assert!(struct_[0].is_exact_match);
     }
