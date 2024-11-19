@@ -1,10 +1,12 @@
 [workspace]
-members = [ "crates/automapper",
+members = [
+    "crates/automapper",
     "crates/automapper-proc",
     "crates/cli",
     "crates/derive",
     "crates/usage",
 ]
+resolver = "2"
 
 [workspace.dependencies]
 rustdoc-json = "0.9.2"

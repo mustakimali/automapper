@@ -110,7 +110,7 @@ mod test {
         let rustdoc = rdoc_parser::test::get_test_data();
         let cache = Cache::new_from_rust_doc_json(rustdoc).unwrap();
 
-        let found = cache
+        let _found = cache
             .find(&FqIdent::try_from_str("nested_inner::NestedSourceInnerType").unwrap())
             .expect("find nested type");
     }

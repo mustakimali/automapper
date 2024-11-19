@@ -27,11 +27,14 @@ pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
     syn::parse_str(&dc.path.join("::")).expect("failed to parse path")
 }
 
+/// Find enums by name.
+///
+///
 pub fn query_enums(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<EnumWrapper>> {
     search::query_items(name, rdocs)
         .context("find struct by name")?
         .into_iter()
-        .filter(|i| matches!(i.item.kind, rustdoc_types::ItemKind::Struct))
+        .filter(|i| matches!(i.item.kind, rustdoc_types::ItemKind::Enum))
         .map(|result| _find_enum_with_resolved_variants(&result, rdocs))
         .collect::<anyhow::Result<Vec<_>>>()
 }
@@ -344,17 +347,21 @@ mod test {
     #[test]
     fn find_struct() {
         let rdoc = get_test_data();
-        let struct_ = query_structs(&format_ident!("Test").into(), &rdoc).unwrap();
+        let struct_ = query_structs(&format_ident!("SourceStruct").into(), &rdoc).unwrap();
         assert_eq!(struct_.len(), 1);
         assert!(!struct_[0].is_exact_match);
 
-        let struct_ = query_structs(&syn::parse_str("usage::Test").unwrap(), &rdoc).unwrap();
+        let struct_ = query_structs(
+            &syn::parse_str("usage::v2::models::SourceStruct").unwrap(),
+            &rdoc,
+        )
+        .unwrap();
         assert_eq!(struct_.len(), 1);
         assert!(struct_[0].is_exact_match);
     }
 
     pub(crate) fn get_test_data() -> Crate {
-        let json = include_str!("../../usage/rustdoc.json");
+        let json = include_str!("../../usage/rustdoc_v2.json");
         serde_json::from_str(json).unwrap()
     }
 }
