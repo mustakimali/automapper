@@ -1,4 +1,5 @@
-use super::*;
+use anyhow::anyhow;
+use rustdoc_types::{Crate, ItemSummary};
 
 pub struct SearchResult<'a> {
     pub exact_match: bool,

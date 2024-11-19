@@ -32,7 +32,7 @@ pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
     syn::parse_str(&dc.path.join("::")).expect("failed to parse path")
 }
 
-pub fn query_enums(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<EnumWrapper>> {
+pub fn query_enums(_name: &syn::Path, _rdocs: &Crate) -> anyhow::Result<Vec<EnumWrapper>> {
     todo!()
 }
 
