@@ -9,7 +9,22 @@ mod search;
 // Public
 //
 
-pub fn find_struct_by_exact_name(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<StructWrapper> {
+pub fn query_types(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<RustType>> {
+    let mut structs = query_structs(name, rdocs)?
+        .into_iter()
+        .map(RustType::Struct)
+        .collect::<Vec<_>>();
+    let enums = query_enums(name, rdocs)?.into_iter().map(RustType::Enum);
+
+    structs.extend(enums.collect::<Vec<_>>());
+
+    Ok(structs)
+}
+
+pub fn find_struct_by_exact_name(
+    name: &syn::Path,
+    rdocs: &Crate,
+) -> anyhow::Result<StructRustType> {
     let items = query_structs(name, rdocs)?;
     items
         .iter()
@@ -30,7 +45,7 @@ pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
 /// Find enums by name.
 ///
 ///
-pub fn query_enums(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<EnumWrapper>> {
+pub fn query_enums(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<EnumRustType>> {
     search::query_items(name, rdocs)
         .context("find struct by name")?
         .into_iter()
@@ -44,7 +59,7 @@ pub fn query_enums(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<EnumWr
 /// This function will return a list of structs that match the given name partially or exactly.
 /// Check the [StructWrapper::is_exact_match] field to see if the match was exact or not.
 ///
-pub fn query_structs(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<StructWrapper>> {
+pub fn query_structs(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<StructRustType>> {
     search::query_items(name, rdocs)
         .context("find struct by name")?
         .into_iter()
@@ -60,7 +75,7 @@ pub fn query_structs(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<Stru
 fn _find_enum_with_resolved_variants(
     result: &SearchResult,
     rdocs: &Crate,
-) -> Result<EnumWrapper, anyhow::Error> {
+) -> Result<EnumRustType, anyhow::Error> {
     let rustdoc_types::ItemKind::Enum = result.item.kind else {
         bail!("not an enum type")
     };
@@ -109,7 +124,7 @@ fn _find_enum_with_resolved_variants(
         })
         .collect::<Vec<_>>();
 
-    Ok(EnumWrapper {
+    Ok(EnumRustType {
         is_exact_match: result.exact_match,
         is_root_crate: item.crate_id == 0,
         path: result.item.path.clone(),
@@ -120,7 +135,7 @@ fn _find_enum_with_resolved_variants(
 fn _find_struct_with_resolved_fields(
     result: &SearchResult,
     rdocs: &Crate,
-) -> Result<StructWrapper, anyhow::Error> {
+) -> Result<StructRustType, anyhow::Error> {
     let rustdoc_types::ItemKind::Struct = result.item.kind else {
         bail!("not a struct type")
     };
@@ -149,7 +164,7 @@ fn _find_struct_with_resolved_fields(
         },
     };
 
-    Ok(StructWrapper {
+    Ok(StructRustType {
         is_exact_match: result.exact_match,
         is_root_crate: item.crate_id == 0,
         path: result.item.path.clone(),
@@ -185,7 +200,13 @@ fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFie
 }
 
 #[derive(Debug, Clone)]
-pub struct EnumWrapper {
+pub enum RustType {
+    Struct(StructRustType),
+    Enum(EnumRustType),
+}
+
+#[derive(Debug, Clone)]
+pub struct EnumRustType {
     pub is_exact_match: bool,
     is_root_crate: bool,
     pub path: Vec<String>,
@@ -208,14 +229,14 @@ pub enum EnumVariantKind {
 }
 
 #[derive(Debug, Clone)]
-pub struct StructWrapper {
+pub struct StructRustType {
     pub is_exact_match: bool,
     is_root_crate: bool,
     pub path: Vec<String>,
     pub kind: StructKind,
 }
 
-impl StructWrapper {
+impl StructRustType {
     pub fn name(&self) -> &str {
         self.path.last().expect("name")
     }

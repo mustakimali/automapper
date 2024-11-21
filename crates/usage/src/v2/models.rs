@@ -50,3 +50,25 @@ pub struct DestStruct4 {
     pub nested: DestStruct,
     pub optional: Option<DestStruct>,
 }
+
+pub enum SourceEnumBasic {
+    Unit,
+    Touple(u32, u32),
+    ToupleSingle(SourceStruct),
+    Struct {
+        field1: u32,
+        field2: String,
+        nested: SourceStruct,
+    },
+}
+
+pub enum DestEnumBasic {
+    Unit,
+    Touple(u32, u32),
+    ToupleSingle(SourceStruct),
+    Struct {
+        field1: u32,
+        field2: String,
+        nested: DestStruct,
+    },
+}

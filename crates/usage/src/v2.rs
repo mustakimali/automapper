@@ -86,3 +86,17 @@ fn optional_fields() {
     assert_eq!(expected_optional.b, optional.b);
     assert_eq!(expected_optional.s, optional.s);
 }
+
+#[test]
+fn simple_enum() {
+    let input = SourceEnumBasic::Struct {
+        field1: 32,
+        field2: "hello".to_string(),
+        nested: SourceStruct {
+            a: 1,
+            b: 2,
+            s: "world".to_string(),
+        },
+    };
+    automapper::map!(SourceEnumBasic, DestEnumBasic);
+}

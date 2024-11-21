@@ -6,15 +6,15 @@ use rustdoc_types::{GenericArg, GenericArgs};
 
 use crate::{
     models::context::MacroCtx,
-    rodc_util::{self, StructFieldKind, StructWrapper},
+    rodc_util::{self, StructFieldKind, StructRustType},
 };
 
 pub struct StructToStructMapping {
-    pub source: StructWrapper,
+    pub source: StructRustType,
     /// The path to the accessor function for the source struct.
     /// Starting from `value` in the root mapping function.
     source_accessor: Vec<String>,
-    pub dest: StructWrapper,
+    pub dest: StructRustType,
     ctx: MacroCtx,
 }
 
@@ -53,7 +53,7 @@ impl StructToStructMapping {
 
     fn map_struct_plain(
         &self,
-        source: &StructWrapper,
+        source: &StructRustType,
         dest_fields: &[rodc_util::StructFieldOrEnumVariant],
         tokens: &mut proc_macro2::TokenStream,
         dest_path: syn::Path,

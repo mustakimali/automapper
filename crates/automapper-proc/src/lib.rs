@@ -7,7 +7,7 @@ use anyhow::Context;
 use models::context::MacroCtx;
 use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
-use rodc_util::StructWrapper;
+use rodc_util::StructRustType;
 use serde_json::Value;
 use struct_to_struct_mapping::StructToStructMapping;
 use syn::{
