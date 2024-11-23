@@ -4,6 +4,7 @@
 use std::{collections::HashSet, ops::Deref, path::PathBuf, sync::Arc};
 
 use anyhow::Context;
+use mapper::TypeToTypeMapping;
 use models::context::MacroCtx;
 use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
@@ -13,12 +14,11 @@ use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
     DeriveInput, Meta, Token,
 };
-use type_to_type_mapping::TypeToTypeMapping;
 use walkdir::WalkDir;
 
+mod mapper;
 mod models;
 mod rodc_util;
-mod type_to_type_mapping;
 
 #[derive(Debug)]
 struct TraitImpl {
