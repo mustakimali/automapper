@@ -1,5 +1,7 @@
 #![allow(unused)]
 
+use std::time::SystemTime;
+
 use crate::v2;
 use automapper::{AutoMapsFrom, AutoMapsTo};
 use models::*;
@@ -69,26 +71,30 @@ fn optional_fields() {
             s: "optional".to_string(),
         }),
     };
+    let expected_output = DestStruct4 {
+        s: "hello".to_string(),
+        nested: DestStruct {
+            a: 1,
+            b: 2,
+            s: "world".to_string(),
+        },
+        optional: Some(DestStruct {
+            a: 3,
+            b: 4,
+            s: "optional".to_string(),
+        }),
+    };
 
     automapper::map!(SourceStruct3, DestStruct4);
     let output = input.clone().map_to();
 
-    assert_eq!(input.s, output.s);
-    assert_eq!(input.nested.a, output.nested.a);
-    assert_eq!(input.nested.b, output.nested.b);
-    assert_eq!(input.nested.s, output.nested.s);
-
-    assert!(output.optional.is_some());
-
-    let optional = output.optional.unwrap();
-    let expected_optional = input.optional.unwrap();
-    assert_eq!(expected_optional.a, optional.a);
-    assert_eq!(expected_optional.b, optional.b);
-    assert_eq!(expected_optional.s, optional.s);
+    assert_eq!(output, expected_output);
 }
 
+automapper::map!(SourceStructWithEnum, DestStructWithEnum);
+
 #[test]
-fn simple_enum() {
+fn enum_struct_variant() {
     let input = SourceStructWithEnum {
         enum_: SourceEnumBasic::Struct {
             field1: 32,
@@ -101,5 +107,66 @@ fn simple_enum() {
         },
         field: "yoyo".to_string(),
     };
-    automapper::map!(SourceStructWithEnum, DestStructWithEnum);
+    let expected_output = DestStructWithEnum {
+        enum_: DestEnumBasic::Struct {
+            field1: 32,
+            field2: "hello".to_string(),
+            nested: DestStruct {
+                a: 1,
+                b: 2,
+                s: "world".to_string(),
+            },
+        },
+        field: "yoyo".to_string(),
+    };
+
+    // mapping implemented above:
+    // automapper::map!(SourceStructWithEnum, DestStructWithEnum);
+    let output = DestStructWithEnum::map_from(input.clone());
+
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn enum_touple_variant() {
+    let random_text = random_string();
+    let input = SourceStructWithEnum {
+        enum_: SourceEnumBasic::Touple(222, 2323),
+        field: random_text.clone(),
+    };
+    let expected_output = DestStructWithEnum {
+        enum_: DestEnumBasic::Touple(222, 2323),
+        field: random_text,
+    };
+
+    // mapping implemented above:
+    // automapper::map!(SourceStructWithEnum, DestStructWithEnum);
+
+    let output = DestStructWithEnum::map_from(input.clone());
+
+    assert_eq!(output, expected_output);
+}
+
+#[test]
+fn enum_unit_variant() {
+    let random_text = random_string();
+    let input = SourceStructWithEnum {
+        enum_: SourceEnumBasic::Unit,
+        field: random_text.clone(),
+    };
+    let expected_output = DestStructWithEnum {
+        enum_: DestEnumBasic::Unit,
+        field: random_text,
+    };
+
+    // mapping implemented above:
+    // automapper::map!(SourceStructWithEnum, DestStructWithEnum);
+
+    let output = DestStructWithEnum::map_from(input.clone());
+
+    assert_eq!(output, expected_output);
+}
+
+fn random_string() -> String {
+    format!("{:?}", SystemTime::now())
 }
