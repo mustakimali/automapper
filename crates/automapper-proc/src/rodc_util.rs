@@ -223,6 +223,19 @@ pub struct EnumVariant {
     pub kind: EnumVariantKind,
 }
 
+impl EnumVariant {
+    pub fn are_same_kind(&self, other: &EnumVariant) -> bool {
+        matches!(
+            (&self.kind, &other.kind),
+            (
+                EnumVariantKind::Struct { .. },
+                EnumVariantKind::Struct { .. }
+            ) | (EnumVariantKind::Plain, EnumVariantKind::Plain)
+                | (EnumVariantKind::Tuple(_), EnumVariantKind::Tuple(_))
+        )
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum EnumVariantKind {
     Plain,
@@ -284,24 +297,12 @@ impl RustType {
         let segments = segments.join("::");
         syn::parse_str(&segments).expect("parse path")
     }
-}
 
-impl StructRustType {
-    pub fn name(&self) -> &str {
-        self.path.last().expect("name")
-    }
-    pub fn path(&self) -> syn::Path {
-        let mut segments = self
-            .path
-            .clone()
-            .into_iter()
-            .skip(if self.is_root_crate { 1 } else { 0 }) // TODO(FIX): Skip the crate name
-            .collect::<Vec<_>>();
-        if self.is_root_crate {
-            segments.insert(0, "crate".to_string());
-        }
-        let segments = segments.join("::");
-        syn::parse_str(&segments).expect("parse path")
+    pub fn are_same_kind(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (RustType::Struct(_), RustType::Struct(_)) | (RustType::Enum(_), RustType::Enum(_))
+        )
     }
 }
 
@@ -434,5 +435,38 @@ mod test {
     pub(crate) fn get_test_data() -> Crate {
         let json = include_str!("../../usage/rustdoc_v2.json");
         serde_json::from_str(json).unwrap()
+    }
+}
+
+pub trait KindAsStr {
+    fn kind_as_str(&self) -> &'static str;
+}
+
+impl KindAsStr for EnumVariant {
+    fn kind_as_str(&self) -> &'static str {
+        match self.kind {
+            EnumVariantKind::Plain => "Plain",
+            EnumVariantKind::Tuple(_) => "Tuple",
+            EnumVariantKind::Struct { .. } => "Struct",
+        }
+    }
+}
+
+impl KindAsStr for RustType {
+    fn kind_as_str(&self) -> &'static str {
+        match self {
+            RustType::Struct(_) => "Struct",
+            RustType::Enum(_) => "Enum",
+        }
+    }
+}
+
+impl KindAsStr for StructKind {
+    fn kind_as_str(&self) -> &'static str {
+        match self {
+            StructKind::Unit => "Unit",
+            StructKind::Tuple(_) => "Tuple",
+            StructKind::Plain { .. } => "Plain",
+        }
     }
 }

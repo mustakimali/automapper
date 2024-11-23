@@ -6,7 +6,7 @@ use rustdoc_types::{GenericArg, GenericArgs};
 
 use crate::{
     models::context::MacroCtx,
-    rodc_util::{self, RustType, StructFieldKind, StructRustType},
+    rodc_util::{self, KindAsStr, RustType, StructFieldKind, StructRustType},
 };
 
 pub struct TypeToTypeMapping {
@@ -43,6 +43,11 @@ impl TypeToTypeMapping {
             })
             .unwrap();
 
+        anyhow::ensure!(
+            source.are_same_kind(&dest),
+            "don't know how to map between structs and enums"
+        );
+
         Ok(Self {
             source,
             source_field_accessor: source_accessor,
@@ -69,7 +74,8 @@ impl TypeToTypeMapping {
 
         let mut mappings = Vec::with_capacity(dest_fields.len());
         for dest_f in dest_fields.iter() {
-            let Some(map) = self.create_field_mapping(source_fields, dest_f, &accessor) else {
+            let Some(map) = self.create_field_mapping(source_fields, dest_f, Some(&accessor))
+            else {
                 continue;
             };
             mappings.push(map);
@@ -86,8 +92,9 @@ impl TypeToTypeMapping {
         &self,
         source_fields: &[rodc_util::StructFieldOrEnumVariant],
         dest_field: &rodc_util::StructFieldOrEnumVariant,
-        accessor: &proc_macro2::TokenStream,
+        accessor: Option<&proc_macro2::TokenStream>,
     ) -> Option<proc_macro2::TokenStream> {
+        // ^ TODO: remove Option
         let Some(source_field) = source_fields.iter().find(|f| f.name == dest_field.name) else {
             panic!(
                 "failed to find matching source field for dest field: {}",
@@ -104,19 +111,26 @@ impl TypeToTypeMapping {
             );
         }
 
+        let accessor_with_field = match accessor {
+            Some(accessor) => quote! {
+                #accessor.#source_f_name
+            },
+            None => quote! { #source_f_name },
+        };
+
         match &dest_field.kind {
             rodc_util::StructFieldKind::Primitive { name: _ } => {
                 if dest_field.kind.is_primitive_eq(&source_field.kind) {
                     // primitive types: can be directly assigned
 
                     Some(quote! {
-                        #dest_f_name: #accessor.#source_f_name, /* primative type */
+                        #dest_f_name: #accessor_with_field, /* primative type */
                     })
                 } else {
                     // primitive types: may require explicit casting
                     //TODO(FIX): only castable types
                     Some(quote! {
-                        #dest_f_name: #accessor.#source_f_name as _, /* primative type with casting */
+                        #dest_f_name: #accessor_with_field as _, /* primative type with casting */
                     })
                 }
             }
@@ -127,7 +141,7 @@ impl TypeToTypeMapping {
                     unreachable!("must be resolved path")
                 };
 
-                // Possiblity: Option<T> or Result<T, E>
+                // Possiblity: Option<T>
                 //
                 //
                 if StructFieldKind::are_both_option_type(&source_field.kind, &dest_field.kind) {
@@ -156,6 +170,8 @@ impl TypeToTypeMapping {
                     });
                 }
 
+                // TODO: Result<T, E> mapping
+
                 // Possiblity: Same type with different generic arg
                 //
                 //
@@ -166,7 +182,7 @@ impl TypeToTypeMapping {
                 if dest_path.id == source_path.id {
                     // same path: can be directly assigned
                     return Some(quote! {
-                        #dest_f_name: #accessor.#source_f_name, /* primative type */
+                        #dest_f_name: #accessor_with_field, /* primative type */
                     });
                 }
 
@@ -174,11 +190,14 @@ impl TypeToTypeMapping {
                 //
                 //
                 let new_source_accessor = {
-                    let mut s = self.source_field_accessor.clone();
+                    let mut s = accessor
+                        .map(|_| self.source_field_accessor.clone())
+                        .unwrap_or_default();
                     s.push(source_f_name.to_string());
                     s
                 };
-                let struct_mapping = TypeToTypeMapping::new(
+
+                let nested_type_mappings = TypeToTypeMapping::new(
                     rodc_util::find_path_by_id(&source_path.id, &self.ctx.rdocs),
                     new_source_accessor,
                     rodc_util::find_path_by_id(&dest_path.id, &self.ctx.rdocs),
@@ -194,7 +213,7 @@ impl TypeToTypeMapping {
                 .unwrap();
 
                 Some(quote! {
-                    #dest_f_name: #struct_mapping,
+                    #dest_f_name: #nested_type_mappings,
                 })
             }
         }
@@ -245,10 +264,104 @@ impl ToTokens for TypeToTypeMapping {
                 let accessor = self.source_field_accessor();
 
                 // TODO: handle non-exhaustive enum
+                let mut mappings = Vec::with_capacity(source.variants.len());
+
+                for source_v in &source.variants {
+                    let Some(matching_dest_v) =
+                        dest_enum.variants.iter().find(|v| v.name == source_v.name)
+                    else {
+                        panic!(
+                            "failed to find matching source variant for dest enum field: {}",
+                            source_v.name.clone()
+                        );
+                    };
+
+                    if !source_v.are_same_kind(&matching_dest_v) {
+                        panic!(
+                            "source and dest variant kind mismatch: source: {}, dest: {}",
+                            source_v.kind_as_str(),
+                            matching_dest_v.kind_as_str()
+                        );
+                    }
+
+                    let source_v_name = format_ident!("{}", source_v.name.clone());
+                    let dest_v_name = format_ident!("{}", matching_dest_v.name.clone());
+                    let source_path = self.source.path();
+                    let dest_path = self.dest.path();
+
+                    match &source_v.kind {
+                        rodc_util::EnumVariantKind::Plain => {
+                            let rodc_util::EnumVariantKind::Plain = matching_dest_v.kind else {
+                                unreachable!() // same kind check happened above
+                            };
+
+                            mappings.push(quote! {
+                                #source_path::#source_v_name => #dest_path::#dest_v_name,
+
+                            });
+                        }
+                        rodc_util::EnumVariantKind::Tuple(source_v_tuple_items) => {
+                            let rodc_util::EnumVariantKind::Tuple(dest_v_tuple_items) =
+                                &matching_dest_v.kind
+                            else {
+                                unreachable!() // same kind check happened above
+                            };
+
+                            let source_items_i = source_v_tuple_items
+                                .iter()
+                                .enumerate()
+                                .map(|(i, _)| format_ident!("item_{}", i))
+                                .collect::<Vec<_>>();
+
+                            mappings.push(quote! {
+                                #source_path::#source_v_name(#(#source_items_i),*) => #dest_path::#dest_v_name(#(#source_items_i),*),
+                            });
+                        }
+                        rodc_util::EnumVariantKind::Struct {
+                            fields: source_v_fields,
+                        } => {
+                            let rodc_util::EnumVariantKind::Struct {
+                                fields: dest_v_fields,
+                            } = &matching_dest_v.kind
+                            else {
+                                unreachable!() // same kind check happened above
+                            };
+
+                            let fields_i = source_v_fields
+                                .iter()
+                                .map(|f| {
+                                    format_ident!(
+                                        "{}",
+                                        f.name.clone().expect("name for struct field")
+                                    )
+                                })
+                                .collect::<Vec<_>>();
+
+                            let mut variant_field_mappings =
+                                Vec::with_capacity(dest_v_fields.len());
+
+                            for dest_v_field in dest_v_fields {
+                                let Some(mapping) = self.create_field_mapping(
+                                    &source_v_fields,
+                                    dest_v_field,
+                                    None, // just use the field name
+                                ) else {
+                                    continue;
+                                };
+
+                                variant_field_mappings.push(mapping);
+                            }
+
+                            mappings.push(quote! {
+                                #source_path::#source_v_name{ #(#fields_i),* } => #dest_path::#dest_v_name { #(#variant_field_mappings)* },
+                            });
+                        }
+                    }
+                }
 
                 tokens.extend(quote! {
                     match #accessor {
-                        _ => todo!(),
+                        #(#mappings)*
                     }
                 })
             }

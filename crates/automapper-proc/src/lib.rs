@@ -111,7 +111,7 @@ impl ToTokens for TraitImpl {
         };
 
         #[cfg(debug_assertions)]
-        std::fs::write("output.rs", t.to_string()).expect("write to output.rs");
+        std::fs::write("crates/usage/src/output.rs", t.to_string()).expect("write to output.rs");
 
         tokens.extend(t);
     }

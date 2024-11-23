@@ -4,7 +4,7 @@ use crate::v2;
 use automapper::{AutoMapsFrom, AutoMapsTo};
 use models::*;
 
-mod models;
+pub(crate) mod models;
 
 mod tests {
     use automapper::{AutoMapsFrom, AutoMapsTo};
