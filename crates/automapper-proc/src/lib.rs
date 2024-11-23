@@ -9,16 +9,16 @@ use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use rodc_util::StructRustType;
 use serde_json::Value;
-use struct_to_struct_mapping::TypeToTypeMapping;
 use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
     DeriveInput, Meta, Token,
 };
+use type_to_type_mapping::TypeToTypeMapping;
 use walkdir::WalkDir;
 
 mod models;
 mod rodc_util;
-mod struct_to_struct_mapping;
+mod type_to_type_mapping;
 
 #[derive(Debug)]
 struct TraitImpl {
