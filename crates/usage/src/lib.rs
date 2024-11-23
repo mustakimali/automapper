@@ -4,22 +4,19 @@ pub mod models;
 
 //
 // Structs mappings
-automapper::map!(models::SourceStruct, models::DestStruct);
-automapper::map!(models::SourceStruct2, models::DestStruct2);
+automapper::map!(models::SourceStruct => models::DestStruct);
+automapper::map!(models::SourceStruct2 => models::DestStruct2);
 
 //
 // Struct with Optional fields
-automapper::map!(SourceStruct3, DestStruct4);
+automapper::map!(SourceStruct3 => DestStruct4);
 
 //
 // Enum mappings
-automapper::map!(SourceStructWithEnum, DestStructWithEnum);
+automapper::map!(SourceStructWithEnum => DestStructWithEnum);
 
 //
 // Custom mapping
-// automapper::map!(
-//     models::SourceStructWithDifferentField,
-//     models::DestStructWithDifferentField
-// );
+//automapper::map!(models::SourceStructWithDifferentField > models::DestStructWithDifferentField);
 
 // See tests in tests/*.rs folder

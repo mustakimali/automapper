@@ -1,8 +1,10 @@
 #![doc = include_str!("../README.md")]
 
-/// Re-exported from [automapper_proc::impl_map_fn]
-///
-pub use ::automapper_proc::impl_map_fn;
+pub mod macros {
+    /// Re-exported from [automapper_proc::impl_map_fn]
+    ///
+    pub use ::automapper_proc::impl_map_fn;
+}
 
 pub trait AutoMapsTo<Dest> {
     fn map_to(self) -> Dest;
@@ -26,11 +28,11 @@ pub trait AutoMapsFrom<T> {
 
 #[macro_export]
 macro_rules! map {
-    ($s: path, $d: path) => {
+    ($s: path => $d: path) => {
         impl ::automapper::AutoMapsTo<$d> for $s {
             fn map_to(self) -> $d {
-                ::automapper::impl_map_fn! {
-                    fn __map($s -> $d);
+                ::automapper::macros::impl_map_fn! {
+                    fn __map($s => $d);
                 }
 
                 __map(self)

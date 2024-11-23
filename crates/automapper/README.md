@@ -35,7 +35,7 @@ pub struct DestStruct {
 Use `automapper` using auto implemented trait [AutoMapsTo] and [AutoMapsFrom]
 
 ```ignore
-automapper::map!(SourceStruct, DestStruct);
+automapper::map!(SourceStruct => DestStruct);
 
 use automapper::{AutoMapsFrom, AutoMapsTo};
 let input = SourceStruct { .. };
@@ -49,7 +49,7 @@ Or, Use `automapper` to generate mapping function
 
 ```ignore,rust
 automapper::impl_map_fn!{
-   fn convert_to(SourceStruct -> DestStruct);
+   fn convert_to(SourceStruct => DestStruct);
 }
 
 // this generates `convert_to` function like this
