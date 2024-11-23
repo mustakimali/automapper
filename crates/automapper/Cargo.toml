@@ -1,7 +1,14 @@
 [package]
 name = "automapper"
-version = "0.1.0"
+description = "A simple convention based object-to-object mapper for Rust"
+version = "0.0.2"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Mohammad Mustakim Ali <i@mustak.im>"]
+documentation = "https://docs.rs/automapper/"
+repository = "https://github.com/mustakimali/automapper"
+categories = ["development-tools"]
+publish = true
 
 [dependencies]
-automapper-proc = { version = "0.1.0", path = "../automapper-proc" }
+automapper-proc = { version = "0.0.1", path = "../automapper-proc" }

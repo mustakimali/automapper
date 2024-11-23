@@ -1,7 +1,14 @@
 [package]
 name = "automapper-cli"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
+description = "Convenient CLI to generate rustdoc.json needed to perform object-to-object mapping using automapper. Requires nightly toolchain."
+license = "MIT OR Apache-2.0"
+authors = ["Mohammad Mustakim Ali <i@mustak.im>"]
+documentation = "https://docs.rs/automapper/"
+repository = "https://github.com/mustakimali/automapper"
+categories = ["development-tools"]
+publish = true
 
 [dependencies]
 rustdoc-json = { workspace = true }

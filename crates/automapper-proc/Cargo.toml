@@ -1,7 +1,14 @@
 [package]
 name = "automapper-proc"
-version = "0.1.0"
+description = "Procedural macro for automapper - please use `automapper` crate"
+version = "0.0.1"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Mohammad Mustakim Ali <i@mustak.im>"]
+documentation = "https://docs.rs/automapper/"
+repository = "https://github.com/mustakimali/automapper"
+categories = ["development-tools"]
+publish = true
 
 [lib]
 proc-macro = true

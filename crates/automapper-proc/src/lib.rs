@@ -36,8 +36,9 @@ struct Request {
     dest_type: syn::Path,
 }
 
+/// See crate level doc for automapper for more information.
 #[proc_macro]
-pub fn map(input: TokenStream) -> TokenStream {
+pub fn impl_map_fn(input: TokenStream) -> TokenStream {
     let def = parse_macro_input!(input as TraitImpl);
     def.into_token_stream().into()
 }
