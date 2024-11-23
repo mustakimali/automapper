@@ -9,7 +9,7 @@ use proc_macro::{Span, TokenStream};
 use quote::{format_ident, quote, ToTokens};
 use rodc_util::StructRustType;
 use serde_json::Value;
-use struct_to_struct_mapping::StructToStructMapping;
+use struct_to_struct_mapping::TypeToTypeMapping;
 use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
     DeriveInput, Meta, Token,
@@ -92,7 +92,7 @@ impl ToTokens for TraitImpl {
 
         let ctx = MacroCtx::new(rdocs);
 
-        let mapping = StructToStructMapping::new(
+        let mapping = TypeToTypeMapping::new(
             self.mapping.source_type.clone(),
             vec!["value".to_string()], // the name of the input variable in the mapping function
             self.mapping.dest_type.clone(),

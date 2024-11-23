@@ -6,38 +6,38 @@ use rustdoc_types::{GenericArg, GenericArgs};
 
 use crate::{
     models::context::MacroCtx,
-    rodc_util::{self, StructFieldKind, StructRustType},
+    rodc_util::{self, RustType, StructFieldKind, StructRustType},
 };
 
-pub struct StructToStructMapping {
-    pub source: StructRustType,
+pub struct TypeToTypeMapping {
+    pub source: RustType,
     /// The path to the accessor function for the source struct.
     /// Starting from `value` in the root mapping function.
-    source_accessor: Vec<String>,
-    pub dest: StructRustType,
+    source_field_accessor: Vec<String>,
+    pub dest: RustType,
     ctx: MacroCtx,
 }
 
-impl StructToStructMapping {
+impl TypeToTypeMapping {
     pub fn new(
         source_path: syn::Path,
         source_accessor: Vec<String>,
         dest_path: syn::Path,
         ctx: MacroCtx,
     ) -> anyhow::Result<Self> {
-        let source = rodc_util::find_struct_by_exact_name(&source_path, &ctx.rdocs)
+        let source = rodc_util::find_types_try_exact(&source_path, &ctx.rdocs)
             .with_context(|| {
                 format!(
-                    "failed to find source struct: {}",
+                    "failed to find source type: `{}`",
                     source_path.to_token_stream()
                 )
             })
             .unwrap();
 
-        let dest = rodc_util::find_struct_by_exact_name(&dest_path, &ctx.rdocs)
+        let dest = rodc_util::find_types_try_exact(&dest_path, &ctx.rdocs)
             .with_context(|| {
                 format!(
-                    "failed to find dest struct: {}",
+                    "failed to find dest type: `{}`",
                     dest_path.to_token_stream()
                 )
             })
@@ -45,7 +45,7 @@ impl StructToStructMapping {
 
         Ok(Self {
             source,
-            source_accessor,
+            source_field_accessor: source_accessor,
             dest,
             ctx,
         })
@@ -64,12 +64,8 @@ impl StructToStructMapping {
         else {
             panic!("source struct is not plain struct");
         };
-        let accessor = self
-            .source_accessor
-            .iter()
-            .map(|i| format_ident!("{}", i))
-            .collect::<Vec<_>>();
-        let accessor = quote! { #(#accessor).* };
+
+        let accessor = self.source_field_accessor();
 
         let mut mappings = Vec::with_capacity(dest_fields.len());
         for dest_f in dest_fields.iter() {
@@ -138,7 +134,7 @@ impl StructToStructMapping {
                     let source_t_of_option = source_field.t_of_option().unwrap();
                     let dest_t_of_option = dest_field.t_of_option().unwrap();
 
-                    let struct_mapping_inside_lambda = StructToStructMapping::new(
+                    let struct_mapping_inside_lambda = TypeToTypeMapping::new(
                         rodc_util::find_path_by_id(&source_t_of_option.id, &self.ctx.rdocs),
                         vec!["v".to_string()],
                         rodc_util::find_path_by_id(&dest_t_of_option.id, &self.ctx.rdocs),
@@ -178,11 +174,11 @@ impl StructToStructMapping {
                 //
                 //
                 let new_source_accessor = {
-                    let mut s = self.source_accessor.clone();
+                    let mut s = self.source_field_accessor.clone();
                     s.push(source_f_name.to_string());
                     s
                 };
-                let struct_mapping = StructToStructMapping::new(
+                let struct_mapping = TypeToTypeMapping::new(
                     rodc_util::find_path_by_id(&source_path.id, &self.ctx.rdocs),
                     new_source_accessor,
                     rodc_util::find_path_by_id(&dest_path.id, &self.ctx.rdocs),
@@ -203,26 +199,56 @@ impl StructToStructMapping {
             }
         }
     }
+
+    /// Convert the accessor (how to access the source field being mapped / the current field being mapped)
+    /// into a token stream
+    fn source_field_accessor(&self) -> proc_macro2::TokenStream {
+        let accessor = self
+            .source_field_accessor
+            .iter()
+            .map(|i| format_ident!("{}", i))
+            .collect::<Vec<_>>();
+        quote! { #(#accessor).* }
+    }
 }
 
-impl ToTokens for StructToStructMapping {
+impl ToTokens for TypeToTypeMapping {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let source = &self.source;
         let dest = &self.dest;
-
         let dest_path = dest.path();
 
-        match &dest.kind {
-            rodc_util::StructKind::Unit => {
-                tokens.extend(quote! {
-                    #dest_path // unit struct
-                });
+        match dest {
+            RustType::Struct(dest_struct) => {
+                let RustType::Struct(source) = &self.source else {
+                    unreachable!()
+                };
+
+                match &dest_struct.kind {
+                    rodc_util::StructKind::Unit => {
+                        tokens.extend(quote! {
+                            #dest_path // unit struct
+                        });
+                    }
+                    rodc_util::StructKind::Tuple(_vec) => todo!(),
+                    rodc_util::StructKind::Plain {
+                        fields: dest_fields,
+                    } => {
+                        self.map_struct_plain(source, dest_fields, tokens, dest_path);
+                    }
+                }
             }
-            rodc_util::StructKind::Tuple(_vec) => todo!(),
-            rodc_util::StructKind::Plain {
-                fields: dest_fields,
-            } => {
-                self.map_struct_plain(source, dest_fields, tokens, dest_path);
+            RustType::Enum(dest_enum) => {
+                let RustType::Enum(source) = &self.source else {
+                    unreachable!()
+                };
+
+                let accessor = self.source_field_accessor();
+
+                tokens.extend(quote! {
+                    match #accessor {
+                        _ => todo!(),
+                    }
+                })
             }
         }
     }

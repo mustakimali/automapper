@@ -14,24 +14,23 @@ pub fn query_types(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<RustTy
         .into_iter()
         .map(RustType::Struct)
         .collect::<Vec<_>>();
-    let enums = query_enums(name, rdocs)?.into_iter().map(RustType::Enum);
 
+    let enums = query_enums(name, rdocs)?.into_iter().map(RustType::Enum);
     structs.extend(enums.collect::<Vec<_>>());
 
     Ok(structs)
 }
 
-pub fn find_struct_by_exact_name(
-    name: &syn::Path,
-    rdocs: &Crate,
-) -> anyhow::Result<StructRustType> {
-    let items = query_structs(name, rdocs)?;
+/// Find a type (struct/enum) by name,
+/// return the item with exact match or a similar one otherwise.
+pub fn find_types_try_exact(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<RustType> {
+    let items = query_types(name, rdocs)?;
     items
         .iter()
-        .find(|i| i.is_exact_match)
+        .find(|i| i.exact_match())
         .or_else(|| items.first())
         .cloned()
-        .with_context(|| format!("failed to find struct: {}", name.to_token_stream()))
+        .with_context(|| format!("failed to find type: {}", name.to_token_stream()))
 }
 
 pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
@@ -42,10 +41,14 @@ pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
     syn::parse_str(&dc.path.join("::")).expect("failed to parse path")
 }
 
+//
+// Private
+//
+
 /// Find enums by name.
 ///
 ///
-pub fn query_enums(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<EnumRustType>> {
+fn query_enums(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<EnumRustType>> {
     search::query_items(name, rdocs)
         .context("find struct by name")?
         .into_iter()
@@ -59,7 +62,7 @@ pub fn query_enums(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<EnumRu
 /// This function will return a list of structs that match the given name partially or exactly.
 /// Check the [StructWrapper::is_exact_match] field to see if the match was exact or not.
 ///
-pub fn query_structs(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<StructRustType>> {
+fn query_structs(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<StructRustType>> {
     search::query_items(name, rdocs)
         .context("find struct by name")?
         .into_iter()
@@ -67,10 +70,6 @@ pub fn query_structs(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<Vec<Stru
         .map(|result| _find_struct_with_resolved_fields(&result, rdocs))
         .collect::<anyhow::Result<Vec<_>>>()
 }
-
-//
-// Private
-//
 
 fn _find_enum_with_resolved_variants(
     result: &SearchResult,
@@ -234,6 +233,52 @@ pub struct StructRustType {
     is_root_crate: bool,
     pub path: Vec<String>,
     pub kind: StructKind,
+}
+
+impl RustType {
+    pub fn name(&self) -> &str {
+        match self {
+            RustType::Struct(s) => s.path.last(),
+            RustType::Enum(e) => e.path.last(),
+        }
+        .expect("name")
+    }
+
+    pub fn is_root_crate(&self) -> bool {
+        match self {
+            RustType::Struct(s) => s.is_root_crate,
+            RustType::Enum(e) => e.is_root_crate,
+        }
+    }
+
+    pub fn exact_match(&self) -> bool {
+        match self {
+            RustType::Struct(s) => s.is_exact_match,
+            RustType::Enum(e) => e.is_exact_match,
+        }
+    }
+
+    pub fn path_segments(&self) -> &Vec<String> {
+        match self {
+            RustType::Struct(s) => &s.path,
+            RustType::Enum(e) => &e.path,
+        }
+    }
+
+    pub fn path(&self) -> syn::Path {
+        let is_root_crate = self.is_root_crate();
+        let mut segments = self
+            .path_segments()
+            .clone()
+            .into_iter()
+            .skip(if is_root_crate { 1 } else { 0 }) // TODO(FIX): Skip the crate name
+            .collect::<Vec<_>>();
+        if is_root_crate {
+            segments.insert(0, "crate".to_string());
+        }
+        let segments = segments.join("::");
+        syn::parse_str(&segments).expect("parse path")
+    }
 }
 
 impl StructRustType {
