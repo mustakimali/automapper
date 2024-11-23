@@ -2,8 +2,7 @@
 members = [
     "crates/automapper",
     "crates/automapper-proc",
-    "crates/cli",
-    "crates/derive",
+    "crates/automapper-cli",
     "crates/usage",
 ]
 resolver = "2"

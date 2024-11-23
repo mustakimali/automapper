@@ -424,7 +424,7 @@ mod test {
         assert!(!struct_[0].is_exact_match);
 
         let struct_ = query_structs(
-            &syn::parse_str("usage::v2::models::SourceStruct").unwrap(),
+            &syn::parse_str("usage::models::SourceStruct").unwrap(),
             &rdoc,
         )
         .unwrap();

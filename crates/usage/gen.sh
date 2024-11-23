@@ -6,7 +6,7 @@ rm ../usage/rustdoc.json || true
 cargo check --all || true
 
 echo "Generating rustdoc.json"
-cd ../cli
+cd ../automapper-cli
 cargo run -- ../usage
 
 echo "Formatting rustdoc.json"

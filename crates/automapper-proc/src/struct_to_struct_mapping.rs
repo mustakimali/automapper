@@ -276,7 +276,7 @@ impl ToTokens for TypeToTypeMapping {
                         );
                     };
 
-                    if !source_v.are_same_kind(&matching_dest_v) {
+                    if !source_v.are_same_kind(matching_dest_v) {
                         panic!(
                             "source and dest variant kind mismatch: source: {}, dest: {}",
                             source_v.kind_as_str(),
@@ -344,7 +344,7 @@ impl ToTokens for TypeToTypeMapping {
 
                             for dest_v_field in dest_v_fields {
                                 let Some(mapping) = self.create_field_mapping(
-                                    &source_v_fields,
+                                    source_v_fields,
                                     dest_v_field,
                                     None, // just use the field name
                                 ) else {

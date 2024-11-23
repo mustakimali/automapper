@@ -80,6 +80,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "automapper-cli"
+version = "0.1.0"
+dependencies = [
+ "rustdoc-json",
+ "walkdir",
+]
+
+[[package]]
 name = "automapper-proc"
 version = "0.1.0"
 dependencies = [
@@ -197,14 +205,6 @@ name = "clap_lex"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "afb84c814227b90d6895e01398aee0d8033c00e7466aca416fb6a8e0eb19d8a7"
-
-[[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "rustdoc-json",
- "walkdir",
-]
 
 [[package]]
 name = "colorchoice"
@@ -356,24 +356,6 @@ name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
-
-[[package]]
-name = "lazy-to-map-derive"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "derivative",
- "proc-macro2",
- "quote",
- "rustdoc-json",
- "rustdoc-types",
- "serde",
- "serde_json",
- "syn 2.0.85",
- "thiserror",
- "tracing",
- "walkdir",
-]
 
 [[package]]
 name = "libc"
@@ -842,7 +824,6 @@ dependencies = [
  "automapper-proc",
  "grpc-build",
  "grpc-build-core",
- "lazy-to-map-derive",
  "prost 0.13.3",
  "rustdoc-json",
 ]
