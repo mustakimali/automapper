@@ -30,7 +30,10 @@ fn optional_fields() {
         }),
     };
 
+    //
     // mapping implemented in lib.rs
+    //
+
     let output = input.clone().map_to();
     assert_eq!(output, expected_output);
 

@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use automapper::AutoMapsFrom;
+use automapper::{AutoMapsFrom, AutoMapsTo};
 
 use usage::models::{
     DestEnumBasic, DestStruct, DestStructWithEnum, SourceEnumBasic, SourceStruct,
@@ -34,9 +34,11 @@ fn enum_struct_variant() {
         field: "yoyo".to_string(),
     };
 
-    // mapping implemented above:
-    // automapper::map!(SourceStructWithEnum, DestStructWithEnum);
-    let output = DestStructWithEnum::map_from(input.clone());
+    //
+    // mapping implemented in lib.rs
+    //
+    let _output: DestStructWithEnum = input.clone().map_to(); // uses trait AutoMapsTo
+    let output = DestStructWithEnum::map_from(input.clone()); // Same thing that uses trait AutoMapsFrom (blanket impl)
 
     assert_eq!(output, expected_output);
 }
@@ -53,9 +55,12 @@ fn enum_touple_variant() {
         field: random_text,
     };
 
+    //
     // mapping implemented in lib.rs
+    //
 
-    let output = DestStructWithEnum::map_from(input.clone());
+    let _output: DestStructWithEnum = input.clone().map_to(); // uses trait AutoMapsTo
+    let output = DestStructWithEnum::map_from(input.clone()); // Same thing that uses trait AutoMapsFrom (blanket impl)
 
     assert_eq!(output, expected_output);
 }
@@ -74,7 +79,8 @@ fn enum_unit_variant() {
 
     // mapping implemented in lib.rs
 
-    let output = DestStructWithEnum::map_from(input.clone());
+    let _output: DestStructWithEnum = input.clone().map_to(); // uses trait AutoMapsTo
+    let output = DestStructWithEnum::map_from(input.clone()); // Same thing that uses trait AutoMapsFrom (blanket impl)
 
     assert_eq!(output, expected_output);
 }
