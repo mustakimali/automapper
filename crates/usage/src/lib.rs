@@ -3,17 +3,16 @@ use models::{DestStruct4, DestStructWithEnum, SourceStruct3, SourceStructWithEnu
 pub mod models;
 
 //
-// Structs mapping
-//
+// Structs mappings
 automapper::map!(models::SourceStruct, models::DestStruct);
 automapper::map!(models::SourceStruct2, models::DestStruct2);
 
 //
 // Struct with Optional fields
-//
 automapper::map!(SourceStruct3, DestStruct4);
 
 //
 // Enum mappings
-//
 automapper::map!(SourceStructWithEnum, DestStructWithEnum);
+
+// See tests in tests/*.rs folder
