@@ -24,11 +24,10 @@ impl TypeToTypeMapping {
 
         let accessor = self.source_field_accessor();
 
-        let mut mappings = Vec::with_capacity(dest_fields.len());
-        for dest_f in dest_fields.iter() {
-            let map = self.create_struct_field_mapping(source_fields, dest_f, Some(&accessor))?;
-            mappings.push(map);
-        }
+        let mappings = dest_fields
+            .iter()
+            .map(|dest_f| self.create_struct_field_mapping(source_fields, dest_f, Some(&accessor)))
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         Ok(quote! {
             #dest_path {

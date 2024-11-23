@@ -74,7 +74,7 @@ impl ToTokens for TypeToTypeMapping {
         match dest {
             RustType::Struct(dest_struct) => {
                 let RustType::Struct(source) = &self.source else {
-                    unreachable!()
+                    unreachable!("source and dest must be the same Rust Type at this point")
                 };
 
                 match &dest_struct.kind {
@@ -89,30 +89,28 @@ impl ToTokens for TypeToTypeMapping {
                     rodc_util::StructKind::Plain {
                         fields: dest_fields,
                     } => {
-                        let token = self
+                        let struct_mapping = self
                             .create_struct_mapping_plain(source, dest_fields, dest_path)
                             .expect("map_struct_plain");
-                        tokens.extend(token);
+                        tokens.extend(struct_mapping);
                     }
                 }
             }
             RustType::Enum(dest_enum) => {
                 let RustType::Enum(source) = &self.source else {
-                    unreachable!()
+                    unreachable!("source and dest must be the same Rust Type at this point")
                 };
 
-                let accessor = self.source_field_accessor();
-
                 // TODO: handle non-exhaustive enum
-                let mut variant_mappings = Vec::with_capacity(source.variants.len());
-
-                for source_v in &source.variants {
-                    let token = self.create_single_enum_variant_mapping(dest_enum, source_v);
-                    variant_mappings.push(token);
-                }
+                let source_accessor = self.source_field_accessor();
+                let variant_mappings = source
+                    .variants
+                    .iter()
+                    .map(|source_v| self.create_single_enum_variant_mapping(dest_enum, source_v))
+                    .collect::<Vec<_>>();
 
                 tokens.extend(quote! {
-                    match #accessor {
+                    match #source_accessor {
                         #(#variant_mappings)*
                     }
                 })

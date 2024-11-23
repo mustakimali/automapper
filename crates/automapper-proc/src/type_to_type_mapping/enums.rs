@@ -17,31 +17,34 @@ impl TypeToTypeMapping {
     /// ```
     pub(crate) fn create_single_enum_variant_mapping(
         &self,
-        dest_enum: &rodc_util::EnumRustType,
-        source_v: &rodc_util::EnumVariant,
+        target_enum: &rodc_util::EnumRustType,
+        source_variant: &rodc_util::EnumVariant,
     ) -> proc_macro2::TokenStream {
-        let Some(matching_dest_v) = dest_enum.variants.iter().find(|v| v.name == source_v.name)
+        let Some(matching_dest_v) = target_enum
+            .variants
+            .iter()
+            .find(|v| v.name == source_variant.name)
         else {
             panic!(
                 "failed to find matching source variant for dest enum field: {}",
-                source_v.name.clone()
+                source_variant.name.clone()
             );
         };
 
-        if !source_v.are_same_kind(matching_dest_v) {
+        if !source_variant.are_same_kind(matching_dest_v) {
             panic!(
                 "source and dest variant kind mismatch: source: {}, dest: {}",
-                source_v.kind_as_str(),
+                source_variant.kind_as_str(),
                 matching_dest_v.kind_as_str()
             );
         }
 
-        let source_v_name = format_ident!("{}", source_v.name.clone());
+        let source_v_name = format_ident!("{}", source_variant.name.clone());
         let dest_v_name = format_ident!("{}", matching_dest_v.name.clone());
         let source_path = self.source.path();
         let dest_path = self.dest.path();
 
-        match &source_v.kind {
+        match &source_variant.kind {
             rodc_util::EnumVariantKind::Plain => {
                 let rodc_util::EnumVariantKind::Plain = matching_dest_v.kind else {
                     unreachable!() // same kind check happened above
