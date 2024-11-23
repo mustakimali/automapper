@@ -12,7 +12,7 @@ cargo run -- ../usage
 echo "Formatting rustdoc.json"
 cd ../usage
 cat rustdoc.json | jq -r '.' > rustdoc_2.json
-rm rustdoc_v2.json || true
-mv rustdoc_2.json rustdoc_v2.json
+rm rustdoc.json || true
+mv rustdoc_2.json rustdoc.json
 
 echo "Done."

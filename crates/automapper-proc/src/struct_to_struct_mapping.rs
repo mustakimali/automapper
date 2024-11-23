@@ -301,8 +301,9 @@ impl ToTokens for TypeToTypeMapping {
                             });
                         }
                         rodc_util::EnumVariantKind::Tuple(source_v_tuple_items) => {
-                            let rodc_util::EnumVariantKind::Tuple(dest_v_tuple_items) =
+                            let rodc_util::EnumVariantKind::Tuple(_dest_v_tuple_items) =
                                 &matching_dest_v.kind
+                            // TODO: allow touple items in different order
                             else {
                                 unreachable!() // same kind check happened above
                             };
@@ -313,6 +314,7 @@ impl ToTokens for TypeToTypeMapping {
                                 .map(|(i, _)| format_ident!("item_{}", i))
                                 .collect::<Vec<_>>();
 
+                            // TODO: verify data types (and perform recursive mapping if needed)
                             mappings.push(quote! {
                                 #source_path::#source_v_name(#(#source_items_i),*) => #dest_path::#dest_v_name(#(#source_items_i),*),
                             });

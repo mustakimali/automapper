@@ -433,7 +433,7 @@ mod test {
     }
 
     pub(crate) fn get_test_data() -> Crate {
-        let json = include_str!("../../usage/rustdoc_v2.json");
+        let json = include_str!("../../usage/rustdoc.json");
         serde_json::from_str(json).unwrap()
     }
 }

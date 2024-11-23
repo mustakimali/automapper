@@ -70,7 +70,7 @@ impl Parse for Request {
 impl ToTokens for TraitImpl {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let cargo_toml_path = caller_crate_cargo_toml();
-        let rustdoc_path = cargo_toml_path.parent().unwrap().join("rustdoc_v2.json");
+        let rustdoc_path = cargo_toml_path.parent().unwrap().join("rustdoc.json");
 
         if !rustdoc_path.exists() {
             eprintln!(
@@ -111,8 +111,7 @@ impl ToTokens for TraitImpl {
         };
 
         #[cfg(debug_assertions)]
-        std::fs::write("crates/usage/src/output.rs", t.to_string()).expect("write to output.rs");
-
+        //std::fs::write("crates/usage/src/output.rs", t.to_string()).expect("write to output.rs");
         tokens.extend(t);
     }
 }

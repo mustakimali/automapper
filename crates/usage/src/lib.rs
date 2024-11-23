@@ -1,5 +1,19 @@
-//mod v1;
-mod protogen;
-mod v2;
+use models::{DestStruct4, DestStructWithEnum, SourceStruct3, SourceStructWithEnum};
 
-mod output; // generated code to be written here
+pub mod models;
+
+//
+// Structs mapping
+//
+automapper::map!(models::SourceStruct, models::DestStruct);
+automapper::map!(models::SourceStruct2, models::DestStruct2);
+
+//
+// Struct with Optional fields
+//
+automapper::map!(SourceStruct3, DestStruct4);
+
+//
+// Enum mappings
+//
+automapper::map!(SourceStructWithEnum, DestStructWithEnum);
