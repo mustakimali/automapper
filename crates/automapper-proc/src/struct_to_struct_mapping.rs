@@ -25,23 +25,20 @@ impl TypeToTypeMapping {
         dest_path: syn::Path,
         ctx: MacroCtx,
     ) -> anyhow::Result<Self> {
-        let source = rodc_util::find_types_try_exact(&source_path, &ctx.rdocs)
-            .with_context(|| {
+        let source =
+            rodc_util::find_types_try_exact(&source_path, &ctx.rdocs).with_context(|| {
                 format!(
                     "failed to find source type: `{}`",
                     source_path.to_token_stream()
                 )
-            })
-            .unwrap();
+            })?;
 
-        let dest = rodc_util::find_types_try_exact(&dest_path, &ctx.rdocs)
-            .with_context(|| {
-                format!(
-                    "failed to find dest type: `{}`",
-                    dest_path.to_token_stream()
-                )
-            })
-            .unwrap();
+        let dest = rodc_util::find_types_try_exact(&dest_path, &ctx.rdocs).with_context(|| {
+            format!(
+                "failed to find dest type: `{}`",
+                dest_path.to_token_stream()
+            )
+        })?;
 
         anyhow::ensure!(
             source.are_same_kind(&dest),
@@ -62,7 +59,7 @@ impl TypeToTypeMapping {
         dest_fields: &[rodc_util::StructFieldOrEnumVariant],
         tokens: &mut proc_macro2::TokenStream,
         dest_path: syn::Path,
-    ) {
+    ) -> anyhow::Result<()> {
         let rodc_util::StructKind::Plain {
             fields: source_fields,
         } = &source.kind
@@ -74,10 +71,7 @@ impl TypeToTypeMapping {
 
         let mut mappings = Vec::with_capacity(dest_fields.len());
         for dest_f in dest_fields.iter() {
-            let Some(map) = self.create_field_mapping(source_fields, dest_f, Some(&accessor))
-            else {
-                continue;
-            };
+            let map = self.create_field_mapping(source_fields, dest_f, Some(&accessor))?;
             mappings.push(map);
         }
 
@@ -86,6 +80,8 @@ impl TypeToTypeMapping {
                 #(#mappings)*
             }
         });
+
+        Ok(())
     }
 
     fn create_field_mapping(
@@ -93,7 +89,7 @@ impl TypeToTypeMapping {
         source_fields: &[rodc_util::StructFieldOrEnumVariant],
         dest_field: &rodc_util::StructFieldOrEnumVariant,
         accessor: Option<&proc_macro2::TokenStream>,
-    ) -> Option<proc_macro2::TokenStream> {
+    ) -> anyhow::Result<proc_macro2::TokenStream> {
         // ^ TODO: remove Option
         let Some(source_field) = source_fields.iter().find(|f| f.name == dest_field.name) else {
             panic!(
@@ -118,20 +114,19 @@ impl TypeToTypeMapping {
             None => quote! { #source_f_name },
         };
 
-        match &dest_field.kind {
+        let token_stream = match &dest_field.kind {
             rodc_util::StructFieldKind::Primitive { name: _ } => {
                 if dest_field.kind.is_primitive_eq(&source_field.kind) {
                     // primitive types: can be directly assigned
-
-                    Some(quote! {
+                    quote! {
                         #dest_f_name: #accessor_with_field, /* primative type */
-                    })
+                    }
                 } else {
                     // primitive types: may require explicit casting
                     //TODO(FIX): only castable types
-                    Some(quote! {
+                    quote! {
                         #dest_f_name: #accessor_with_field as _, /* primative type with casting */
-                    })
+                    }
                 }
             }
             rodc_util::StructFieldKind::ResolvedPath { path: dest_path } => {
@@ -145,8 +140,8 @@ impl TypeToTypeMapping {
                 //
                 //
                 if StructFieldKind::are_both_option_type(&source_field.kind, &dest_field.kind) {
-                    let source_t_of_option = source_field.t_of_option().unwrap();
-                    let dest_t_of_option = dest_field.t_of_option().unwrap();
+                    let source_t_of_option = source_field.t_of_option()?;
+                    let dest_t_of_option = dest_field.t_of_option()?;
 
                     let struct_mapping_inside_lambda = TypeToTypeMapping::new(
                         rodc_util::find_path_by_id(&source_t_of_option.id, &self.ctx.rdocs),
@@ -160,16 +155,14 @@ impl TypeToTypeMapping {
                             source_field.name.clone().unwrap_or_default(),
                             dest_field.name.clone().unwrap_or_default()
                         )
-                    })
-                    .unwrap();
+                    })?;
 
-                    return Some(quote! {
+                    quote! {
                         #dest_f_name: #accessor.#source_f_name.map(|v| {
                             #struct_mapping_inside_lambda
                         }),
-                    });
+                    }
                 }
-
                 // TODO: Result<T, E> mapping
 
                 // Possiblity: Same type with different generic arg
@@ -179,44 +172,48 @@ impl TypeToTypeMapping {
 
                 // Possiblity: Same type of struct to struct mapping (non generic)
                 //
-                if dest_path.id == source_path.id {
+                else if dest_path.id == source_path.id {
                     // same path: can be directly assigned
-                    return Some(quote! {
+                    quote! {
                         #dest_f_name: #accessor_with_field, /* primative type */
-                    });
-                }
+                    }
+                } else {
+                    // Possiblity: Other types (with possibly similar fields)
+                    //
+                    //
+                    let new_source_accessor = {
+                        let mut s = accessor
+                            .map(|_| self.source_field_accessor.clone())
+                            .unwrap_or_default();
+                        s.push(source_f_name.to_string());
+                        s
+                    };
 
-                // Possiblity: Other types (with possibly similar fields)
-                //
-                //
-                let new_source_accessor = {
-                    let mut s = accessor
-                        .map(|_| self.source_field_accessor.clone())
-                        .unwrap_or_default();
-                    s.push(source_f_name.to_string());
-                    s
-                };
-
-                let nested_type_mappings = TypeToTypeMapping::new(
-                    rodc_util::find_path_by_id(&source_path.id, &self.ctx.rdocs),
-                    new_source_accessor,
-                    rodc_util::find_path_by_id(&dest_path.id, &self.ctx.rdocs),
-                    self.ctx.clone(),
-                )
-                .with_context(|| {
-                    format!(
-                        "failed to create mapping for source: {} and dest: {}",
-                        source_field.name.clone().unwrap_or_default(),
-                        dest_field.name.clone().unwrap_or_default()
+                    let nested_type_mappings = TypeToTypeMapping::new(
+                        rodc_util::find_path_by_id(&source_path.id, &self.ctx.rdocs),
+                        new_source_accessor,
+                        rodc_util::find_path_by_id(&dest_path.id, &self.ctx.rdocs),
+                        self.ctx.clone(),
                     )
-                })
-                .unwrap();
+                    .with_context(|| {
+                        format!(
+                            "failed to create mapping for source: {} and dest: {}",
+                            source_field.name.clone().unwrap_or_default(),
+                            dest_field.name.clone().unwrap_or_default()
+                        )
+                    })
+                    .with_context(|| {
+                        format!("Mapping {} to {}", source_path.name, dest_path.name)
+                    })?;
 
-                Some(quote! {
-                    #dest_f_name: #nested_type_mappings,
-                })
+                    quote! {
+                        #dest_f_name: #nested_type_mappings,
+                    }
+                }
             }
-        }
+        };
+
+        Ok(token_stream)
     }
 
     /// Convert the accessor (how to access the source field being mapped / the current field being mapped)
@@ -252,7 +249,8 @@ impl ToTokens for TypeToTypeMapping {
                     rodc_util::StructKind::Plain {
                         fields: dest_fields,
                     } => {
-                        self.map_struct_plain(source, dest_fields, tokens, dest_path);
+                        self.map_struct_plain(source, dest_fields, tokens, dest_path)
+                            .expect("map_struct_plain");
                     }
                 }
             }
@@ -343,13 +341,13 @@ impl ToTokens for TypeToTypeMapping {
                                 Vec::with_capacity(dest_v_fields.len());
 
                             for dest_v_field in dest_v_fields {
-                                let Some(mapping) = self.create_field_mapping(
-                                    source_v_fields,
-                                    dest_v_field,
-                                    None, // just use the field name
-                                ) else {
-                                    continue;
-                                };
+                                let mapping = self
+                                    .create_field_mapping(
+                                        source_v_fields,
+                                        dest_v_field,
+                                        None, // just use the field name
+                                    )
+                                    .unwrap();
 
                                 variant_field_mappings.push(mapping);
                             }

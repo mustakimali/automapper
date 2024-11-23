@@ -17,7 +17,7 @@ automapper-cli .
 
 Define some types and use `automapper` to map between them.
 
-```rust
+```no_run
 // some types
 pub struct SourceStruct {
     pub a: i32,
@@ -34,7 +34,7 @@ pub struct DestStruct {
 
 Use `automapper` using auto implemented trait [AutoMapsTo] and [AutoMapsFrom]
 
-```no_run
+```ignore
 automapper::map!(SourceStruct, DestStruct);
 
 use automapper::{AutoMapsFrom, AutoMapsTo};
@@ -47,7 +47,7 @@ let output = input.map_into(); // using AutoMapsTo trait (type annotation isn't 
 
 Or, Use `automapper` to generate mapping function
 
-```no_run
+```ignore,rust
 automapper::impl_map_fn!{
    fn convert_to(SourceStruct -> DestStruct);
 }

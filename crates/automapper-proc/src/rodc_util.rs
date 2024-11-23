@@ -34,7 +34,7 @@ pub fn find_types_try_exact(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<R
 }
 
 pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
-    let dc = rdocs.paths.get(id).unwrap();
+    let dc = rdocs.paths.get(id).expect("find_path_by_id");
 
     if !matches!(
         dc.kind,

@@ -6,7 +6,6 @@ publish = false
 
 [dependencies]
 automapper = { path = "../automapper" }
-automapper-proc = { path = "../automapper-proc" }
 rustdoc-json = { workspace = true }
 grpc-build-core = "0.3.0"
 prost = "0.13.3"

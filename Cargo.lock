@@ -821,7 +821,6 @@ name = "usage"
 version = "0.1.0"
 dependencies = [
  "automapper",
- "automapper-proc",
  "grpc-build",
  "grpc-build-core",
  "prost 0.13.3",

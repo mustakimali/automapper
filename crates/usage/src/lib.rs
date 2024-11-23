@@ -15,4 +15,11 @@ automapper::map!(SourceStruct3, DestStruct4);
 // Enum mappings
 automapper::map!(SourceStructWithEnum, DestStructWithEnum);
 
+//
+// Custom mapping
+// automapper::map!(
+//     models::SourceStructWithDifferentField,
+//     models::DestStructWithDifferentField
+// );
+
 // See tests in tests/*.rs folder

@@ -86,3 +86,17 @@ pub enum DestEnumBasic {
         nested: DestStruct,
     },
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceStructWithDifferentField {
+    pub a: i32,
+    pub b: i32,
+    pub z: i32, // c is missing
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DestStructWithDifferentField {
+    pub a: i32,
+    pub b: i32,
+    pub c: i32, // this needs to be mapped manually
+}
