@@ -35,9 +35,14 @@ pub fn find_types_try_exact(name: &syn::Path, rdocs: &Crate) -> anyhow::Result<R
 
 pub fn find_path_by_id(id: &rustdoc_types::Id, rdocs: &Crate) -> syn::Path {
     let dc = rdocs.paths.get(id).unwrap();
-    let rustdoc_types::ItemKind::Struct = &dc.kind else {
-        unreachable!("find_path_by_id: path must be a struct type")
-    };
+
+    if !matches!(
+        dc.kind,
+        rustdoc_types::ItemKind::Struct | rustdoc_types::ItemKind::Enum
+    ) {
+        unreachable!("find_path_by_id: path must be a struct or enum type")
+    }
+
     syn::parse_str(&dc.path.join("::")).expect("failed to parse path")
 }
 

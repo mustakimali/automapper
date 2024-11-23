@@ -51,6 +51,16 @@ pub struct DestStruct4 {
     pub optional: Option<DestStruct>,
 }
 
+pub struct SourceStructWithEnum {
+    pub enum_: SourceEnumBasic,
+    pub field: String,
+}
+
+pub struct DestStructWithEnum {
+    pub enum_: DestEnumBasic, // different enum
+    pub field: String,
+}
+
 pub enum SourceEnumBasic {
     Unit,
     Touple(u32, u32),

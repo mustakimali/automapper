@@ -244,6 +244,8 @@ impl ToTokens for TypeToTypeMapping {
 
                 let accessor = self.source_field_accessor();
 
+                // TODO: handle non-exhaustive enum
+
                 tokens.extend(quote! {
                     match #accessor {
                         _ => todo!(),
