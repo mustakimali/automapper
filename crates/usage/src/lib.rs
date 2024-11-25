@@ -1,6 +1,8 @@
 use models::{DestStruct4, DestStructWithEnum, SourceStruct3, SourceStructWithEnum};
 
 pub mod models;
+mod output;
+mod protogen;
 
 //
 // Structs mappings
@@ -16,7 +18,13 @@ automapper::map!(SourceStruct3 => DestStruct4);
 automapper::map!(SourceStructWithEnum => DestStructWithEnum);
 
 //
-// Custom mapping
+// TODO:Custom mapping
 //automapper::map!(models::SourceStructWithDifferentField > models::DestStructWithDifferentField);
+
+//
+// TODO: Proto enum mappings
+automapper::macros::impl_map_fn! {
+    fn map_proto_struct(protogen::example::Person => protogen::example::HomoSepiens);
+}
 
 // See tests in tests/*.rs folder

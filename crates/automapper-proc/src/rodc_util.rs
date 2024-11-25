@@ -383,11 +383,12 @@ impl StructFieldKind {
     }
 
     pub fn are_both_option_type(item1: &StructFieldKind, item2: &StructFieldKind) -> bool {
+        const OPTIONS: [&str; 2] = ["Option", "::core::option::Option"];
         match (item1, item2) {
             (
                 StructFieldKind::ResolvedPath { path: p1 },
                 StructFieldKind::ResolvedPath { path: p2 },
-            ) => p1.name.clone() == "Option" && p2.name == "Option",
+            ) => OPTIONS.contains(&p1.name.as_str()) && OPTIONS.contains(&p2.name.as_str()),
             _ => false,
         }
     }

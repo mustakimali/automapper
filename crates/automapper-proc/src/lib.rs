@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-use std::{collections::HashSet, ops::Deref, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, io::Write, ops::Deref, path::PathBuf, sync::Arc};
 
 use anyhow::Context;
 use mapper::TypeToTypeMapping;
@@ -112,9 +112,36 @@ impl ToTokens for TraitImpl {
         };
 
         #[cfg(debug_assertions)]
-        //std::fs::write("crates/usage/src/output.rs", t.to_string()).expect("write to output.rs");
+        write_debug(t.to_string());
+
         tokens.extend(t);
     }
+}
+
+fn write_debug(code: String) {
+    use std::path::Path;
+    let output_rs_file = Path::new("crates/usage/src/output.rs");
+    if output_rs_file.exists() {
+        let modified = output_rs_file
+            .metadata()
+            .expect("metadata")
+            .modified()
+            .expect("modified");
+        if modified.elapsed().expect("elapsed").as_secs() > 2 {
+            std::fs::remove_file(output_rs_file);
+        }
+    }
+
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(output_rs_file)
+        .expect("open file");
+
+    let code = format!("\n\n{}\n", code);
+    file.write_all(code.as_bytes()).expect("write to file");
+
+    //std::fs::write("crates/usage/src/output.rs", t.to_string()).expect("write to output.rs");
 }
 
 /// Returns the root path of the crate that calls this function.
