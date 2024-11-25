@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use anyhow::{anyhow, bail, Context};
 use quote::{format_ident, ToTokens};
 use rustdoc_types::{Crate, GenericArg, GenericArgs, Item, ItemSummary};
@@ -177,6 +179,22 @@ fn _find_struct_with_resolved_fields(
 }
 
 fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFieldOrEnumVariant> {
+    fn map_field_kind(ty: &rustdoc_types::Type) -> StructFieldKind {
+        match ty {
+            rustdoc_types::Type::ResolvedPath(path) => {
+                StructFieldKind::ResolvedPath { path: path.clone() }
+            }
+            rustdoc_types::Type::Primitive(ty) => StructFieldKind::Primitive { name: ty.clone() },
+            rustdoc_types::Type::Tuple(ty) => {
+                StructFieldKind::Tuple(ty.iter().map(map_field_kind).collect::<Vec<_>>())
+            }
+            _ => {
+                dbg!(ty);
+                unimplemented!("only struct kind plain, resolved path or tuples are supported");
+            }
+        }
+    }
+
     fields
         .iter()
         .flat_map(|id| rdocs.index.get(id))
@@ -185,15 +203,7 @@ fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFie
                 unreachable!("_resolve_fields: must be a struct field")
             };
 
-            let kind = match ty {
-                rustdoc_types::Type::ResolvedPath(path) => {
-                    StructFieldKind::ResolvedPath { path: path.clone() }
-                }
-                rustdoc_types::Type::Primitive(ty) => {
-                    StructFieldKind::Primitive { name: ty.clone() }
-                }
-                _ => unimplemented!("only struct kind plain or resolved path are supported"),
-            };
+            let kind = map_field_kind(ty);
 
             StructFieldOrEnumVariant {
                 name: item.name.clone(),
@@ -326,6 +336,7 @@ pub struct StructFieldOrEnumVariant {
 pub enum StructFieldKind {
     Primitive { name: String },
     ResolvedPath { path: rustdoc_types::Path },
+    Tuple(Vec<StructFieldKind>),
 }
 
 impl StructFieldOrEnumVariant {
@@ -363,10 +374,14 @@ impl StructFieldOrEnumVariant {
 }
 
 impl StructFieldKind {
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> Cow<str> {
         match self {
-            StructFieldKind::Primitive { name } => name,
-            StructFieldKind::ResolvedPath { path } => &path.name,
+            StructFieldKind::Primitive { name } => Cow::Borrowed(name),
+            StructFieldKind::ResolvedPath { path } => Cow::Borrowed(&path.name),
+            StructFieldKind::Tuple(vec) => Cow::Owned(format!(
+                "({})",
+                vec.iter().map(|t| t.as_str()).collect::<Vec<_>>().join(",")
+            )),
         }
     }
     pub fn is_same_kind(&self, other: &StructFieldKind) -> bool {

@@ -1,7 +1,9 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-use std::{collections::HashSet, io::Write, ops::Deref, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashSet, io::Write, ops::Deref, path::PathBuf, sync::Arc, time::SystemTime,
+};
 
 use anyhow::Context;
 use mapper::TypeToTypeMapping;
@@ -14,6 +16,7 @@ use syn::{
     braced, parenthesized, parse::Parse, parse_macro_input, punctuated::Punctuated, token,
     DeriveInput, Meta, Token,
 };
+use ulid::Ulid;
 use walkdir::WalkDir;
 
 mod mapper;
@@ -128,7 +131,7 @@ fn write_debug(code: String) {
             .modified()
             .expect("modified");
         if modified.elapsed().expect("elapsed").as_secs() > 2 {
-            std::fs::remove_file(output_rs_file);
+            _ = std::fs::remove_file(output_rs_file);
         }
     }
 
@@ -138,7 +141,19 @@ fn write_debug(code: String) {
         .open(output_rs_file)
         .expect("open file");
 
-    let code = format!("\n\n{}\n", code);
+    let mod_name = Ulid::new().to_string()[12..].to_lowercase();
+    let time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("time")
+        .as_millis();
+    let code = format!(
+        r#"
+
+        pub mod mod_{}_{} {{
+            {}
+        }}"#,
+        time, mod_name, code
+    );
     file.write_all(code.as_bytes()).expect("write to file");
 
     //std::fs::write("crates/usage/src/output.rs", t.to_string()).expect("write to output.rs");

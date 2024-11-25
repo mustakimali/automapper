@@ -67,6 +67,10 @@ impl TypeToTypeMapping {
         };
 
         let token_stream = match &dest_field.kind {
+            rodc_util::StructFieldKind::Tuple(touple_items) => {
+                // TODO: implement
+                quote! {}
+            }
             rodc_util::StructFieldKind::Primitive { name: _ } => {
                 if dest_field.kind.is_primitive_eq(&source_field.kind) {
                     // primitive types: can be directly assigned

@@ -26,3 +26,4 @@ tracing = { workspace = true }
 rustdoc-json = { workspace = true }
 walkdir = { workspace = true }
 derivative = "2.2.0"
+ulid = "1.1.3"
