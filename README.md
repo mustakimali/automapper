@@ -7,6 +7,7 @@ See examples in `crates/usage/tests`.
 - [x] Basic struct + primitive fields
 - [x] Optional fields
 - [ ] Struct mapping: tuple fields
-- [ ] Enum mapping
+- [x] Enum mapping
 - [ ] Issue when moving tests outside crate
 - [ ] Impl foreign trait for struct
+- [ ] Result mapping
