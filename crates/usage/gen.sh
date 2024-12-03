@@ -2,7 +2,6 @@
 
 set -eu pipefail
 
-rm ../usage/rustdoc.json || true
 cargo check --all || true
 
 echo "Generating rustdoc.json"

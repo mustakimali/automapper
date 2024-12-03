@@ -28,3 +28,18 @@ automapper::macros::impl_map_fn! {
 }
 
 // See tests in tests/*.rs folder
+
+// struct SourcePrim {
+//     a: Option<u32>,
+// }
+// struct DestPrim {
+//     a: Option<u32>,
+// }
+
+// #[test]
+// fn primitive() {
+//     let input = SourcePrim { a: Some(1) };
+//     automapper::macros::impl_map_fn! {
+//         fn map_to(SourcePrim => DestPrim);
+//     };
+// }
