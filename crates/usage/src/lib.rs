@@ -7,13 +7,14 @@ mod protogen;
 
 //
 // Structs mappings
+// Basic
 automapper::map!(models::SourceStruct => models::DestStruct);
+// Recursive mapping of fields
 automapper::map!(models::SourceStruct2 => models::DestStruct2);
-automapper::map!(models::SourcePrim => models::DestPrim);
-
-//
-// Struct with Optional fields
+// Option<T> where T is a struct
 automapper::map!(SourceStruct3 => DestStruct4);
+// Option<T> where T is primitive
+automapper::map!(models::SourcePrim => models::DestPrim);
 
 //
 // Enum mappings

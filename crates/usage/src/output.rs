@@ -1,18 +1,18 @@
 
 
-        pub mod mod_1733489756096_4zrj9f6r2ew8g6 {
+        pub mod mod_1733489957392_f6faf9x27gyrb7 {
             fn __map(value : crate :: models :: SourceStruct) -> crate :: models ::
 DestStruct
 { crate :: models :: DestStruct { a : value.a, b : value.b, s : value.s, } }
         }
 
-        pub mod mod_1733489756098_v7y54a2stw0be2 {
+        pub mod mod_1733489957394_8b9mxcc1ysb4hh {
             fn __map(value : crate :: models :: SourceStruct) -> crate :: models ::
 DestStruct
 { crate :: models :: DestStruct { a : value.a, b : value.b, s : value.s, } }
         }
 
-        pub mod mod_1733489756152_qbbf5eafa8zh6e {
+        pub mod mod_1733489957445_nvg3rsw8bs6x92 {
             fn __map(value : crate :: models :: SourceStruct2) -> crate :: models ::
 DestStruct2
 {
@@ -24,7 +24,7 @@ DestStruct2
 }
         }
 
-        pub mod mod_1733489756154_65zsa37bkenw70 {
+        pub mod mod_1733489957447_hstmpadcvt9psv {
             fn __map(value : crate :: models :: SourceStruct2) -> crate :: models ::
 DestStruct2
 {
@@ -36,17 +36,7 @@ DestStruct2
 }
         }
 
-        pub mod mod_1733489756204_w0m1231nftaqmz {
-            fn __map(value : crate :: models :: SourcePrim) -> crate :: models :: DestPrim
-{ crate :: models :: DestPrim { a : value.a, } }
-        }
-
-        pub mod mod_1733489756207_8tcafka1aj2ngj {
-            fn __map(value : crate :: models :: SourcePrim) -> crate :: models :: DestPrim
-{ crate :: models :: DestPrim { a : value.a, } }
-        }
-
-        pub mod mod_1733489756256_vyhnz0j0e8t7vp {
+        pub mod mod_1733489957500_gc2rx88p46r87k {
             fn __map(value : crate :: models :: SourceStruct3) -> crate :: models ::
 DestStruct4
 {
@@ -61,7 +51,7 @@ DestStruct4
 }
         }
 
-        pub mod mod_1733489756261_58k6w6kjxndkkm {
+        pub mod mod_1733489957502_cxw8v2mrz1ayt0 {
             fn __map(value : crate :: models :: SourceStruct3) -> crate :: models ::
 DestStruct4
 {
@@ -76,7 +66,17 @@ DestStruct4
 }
         }
 
-        pub mod mod_1733489756308_w3k35a4e0pknsf {
+        pub mod mod_1733489957550_d1k561dqg8cdts {
+            fn __map(value : crate :: models :: SourcePrim) -> crate :: models :: DestPrim
+{ crate :: models :: DestPrim { a : value.a, } }
+        }
+
+        pub mod mod_1733489957552_j2k0gg8739cn79 {
+            fn __map(value : crate :: models :: SourcePrim) -> crate :: models :: DestPrim
+{ crate :: models :: DestPrim { a : value.a, } }
+        }
+
+        pub mod mod_1733489957601_wsse8n69wde5hc {
             fn __map(value : crate :: models :: SourceStructWithEnum) -> crate :: models
 :: DestStructWithEnum
 {
@@ -101,7 +101,7 @@ DestStruct4
 }
         }
 
-        pub mod mod_1733489756319_769z4yweram3jg {
+        pub mod mod_1733489957603_nykkrxy5v97sht {
             fn __map(value : crate :: models :: SourceStructWithEnum) -> crate :: models
 :: DestStructWithEnum
 {
@@ -126,7 +126,7 @@ DestStruct4
 }
         }
 
-        pub mod mod_1733489756363_ewpz04n022sazk {
+        pub mod mod_1733489957653_77pxnbr4z503cn {
             fn map_proto_struct(value : crate :: protogen :: example :: Person) -> crate
 :: protogen :: example :: HomoSepiens
 {
@@ -156,7 +156,7 @@ DestStruct4
 }
         }
 
-        pub mod mod_1733489756372_tbqwdharbp9ft0 {
+        pub mod mod_1733489957656_k5cxngdysq3qvc {
             fn map_proto_struct(value : crate :: protogen :: example :: Person) -> crate
 :: protogen :: example :: HomoSepiens
 {
