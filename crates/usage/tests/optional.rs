@@ -1,5 +1,5 @@
 use automapper::{AutoMapsFrom, AutoMapsTo};
-use usage::models::{DestStruct, DestStruct4, SourceStruct, SourceStruct3};
+use usage::models::{DestPrim, DestStruct, DestStruct4, SourcePrim, SourceStruct, SourceStruct3};
 
 #[test]
 fn optional_fields() {
@@ -40,4 +40,11 @@ fn optional_fields() {
     // another way (using trait AutoMapsFrom)
     let output = DestStruct4::map_from(input.clone());
     assert_eq!(output, expected_output);
+}
+
+#[test]
+fn primitive() {
+    let input = SourcePrim { a: Some(100) };
+    let output = DestPrim::map_from(input.clone());
+    assert_eq!(input.a, output.a);
 }

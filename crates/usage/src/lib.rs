@@ -1,7 +1,7 @@
 use models::{DestStruct4, DestStructWithEnum, SourceStruct3, SourceStructWithEnum};
 
 pub mod models;
-#[allow(unused)]
+#[allow(unused, clippy::redundant_field_names)]
 mod output;
 mod protogen;
 
@@ -9,6 +9,7 @@ mod protogen;
 // Structs mappings
 automapper::map!(models::SourceStruct => models::DestStruct);
 automapper::map!(models::SourceStruct2 => models::DestStruct2);
+automapper::map!(models::SourcePrim => models::DestPrim);
 
 //
 // Struct with Optional fields
@@ -29,22 +30,3 @@ automapper::macros::impl_map_fn! {
 }
 
 // See tests in tests/*.rs folder
-
-#[derive(Debug, Clone)]
-struct SourcePrim {
-    a: Option<u32>,
-}
-#[derive(Debug, Clone)]
-struct DestPrim {
-    a: Option<u32>,
-}
-
-#[test]
-fn primitive() {
-    let input = SourcePrim { a: Some(100) };
-    automapper::macros::impl_map_fn! {
-        fn map_to(SourcePrim => DestPrim);
-    };
-    let output = map_to(input.clone());
-    assert_eq!(input.a, output.a);
-}

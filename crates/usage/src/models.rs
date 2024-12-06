@@ -51,6 +51,15 @@ pub struct DestStruct4 {
     pub optional: Option<DestStruct>,
 }
 
+#[derive(Debug, Clone)]
+pub struct SourcePrim {
+    pub a: Option<u32>,
+}
+#[derive(Debug, Clone)]
+pub struct DestPrim {
+    pub a: Option<u32>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceStructWithEnum {
     pub enum_: SourceEnumBasic,
