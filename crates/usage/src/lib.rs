@@ -1,6 +1,7 @@
 use models::{DestStruct4, DestStructWithEnum, SourceStruct3, SourceStructWithEnum};
 
 pub mod models;
+#[allow(unused)]
 mod output;
 mod protogen;
 
@@ -29,12 +30,12 @@ automapper::macros::impl_map_fn! {
 
 // See tests in tests/*.rs folder
 
-// struct SourcePrim {
-//     a: Option<u32>,
-// }
-// struct DestPrim {
-//     a: Option<u32>,
-// }
+struct SourcePrim {
+    a: Option<u32>,
+}
+struct DestPrim {
+    a: Option<u32>,
+}
 
 // #[test]
 // fn primitive() {

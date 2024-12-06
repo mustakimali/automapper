@@ -339,8 +339,22 @@ pub enum StructFieldKind {
     Tuple(Vec<StructFieldKind>),
 }
 
+pub enum TOfOption {
+    ResolvedPath(rustdoc_types::Path),
+    Primitive(String),
+}
+
+impl TOfOption {
+    pub fn as_str(&self) -> &str {
+        match self {
+            TOfOption::ResolvedPath(p) => &p.name,
+            TOfOption::Primitive(p) => p,
+        }
+    }
+}
+
 impl StructFieldOrEnumVariant {
-    pub fn t_of_option(&self) -> anyhow::Result<&rustdoc_types::Path> {
+    pub fn t_of_option(&self) -> anyhow::Result<TOfOption> {
         let StructFieldKind::ResolvedPath { path: source_path } = &self.kind else {
             anyhow::bail!("must be a resolved path")
         };
@@ -363,13 +377,16 @@ impl StructFieldOrEnumVariant {
             anyhow::bail!("unimplemented: Option type with infered, const or lifetype argument")
         };
 
-        let rustdoc_types::Type::ResolvedPath(path) = ty else {
-            dbg!(generic_args);
-
-            anyhow::bail!("unimplemented: Option type with touple value: Option<(,)>")
+        let result = match ty {
+            rustdoc_types::Type::ResolvedPath(path) => TOfOption::ResolvedPath(path.clone()),
+            rustdoc_types::Type::Primitive(p) => TOfOption::Primitive(p.clone()),
+            _ => {
+                dbg!(ty);
+                anyhow::bail!("unimplemented: Option type with unsupported variant")
+            }
         };
 
-        Ok(path)
+        Ok(result)
     }
 }
 

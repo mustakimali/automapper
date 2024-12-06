@@ -67,7 +67,7 @@ impl TypeToTypeMapping {
         };
 
         let token_stream = match &dest_field.kind {
-            rodc_util::StructFieldKind::Tuple(touple_items) => {
+            rodc_util::StructFieldKind::Tuple(_touple_items) => {
                 // TODO: implement
                 quote! {}
             }
@@ -99,24 +99,38 @@ impl TypeToTypeMapping {
                     let source_t_of_option = source_field.t_of_option()?;
                     let dest_t_of_option = dest_field.t_of_option()?;
 
-                    let struct_mapping_inside_lambda = TypeToTypeMapping::new(
-                        rodc_util::find_path_by_id(&source_t_of_option.id, &self.ctx.rdocs),
-                        vec!["v".to_string()],
-                        rodc_util::find_path_by_id(&dest_t_of_option.id, &self.ctx.rdocs),
-                        self.ctx.clone(),
-                    )
-                    .with_context(|| {
-                        format!(
-                            "failed to create mapping for source: {} and dest: {}",
-                            source_field.name.clone().unwrap_or_default(),
-                            dest_field.name.clone().unwrap_or_default()
-                        )
-                    })?;
+                    match (source_t_of_option, dest_t_of_option) {
+                        (
+                            rodc_util::TOfOption::ResolvedPath(source),
+                            rodc_util::TOfOption::ResolvedPath(dest),
+                        ) => {
+                            let struct_mapping_inside_lambda = TypeToTypeMapping::new(
+                                rodc_util::find_path_by_id(&source.id, &self.ctx.rdocs),
+                                vec!["v".to_string()],
+                                rodc_util::find_path_by_id(&dest.id, &self.ctx.rdocs),
+                                self.ctx.clone(),
+                            )
+                            .with_context(|| {
+                                format!(
+                                    "failed to create mapping for source: {} and dest: {}",
+                                    source_field.name.clone().unwrap_or_default(),
+                                    dest_field.name.clone().unwrap_or_default()
+                                )
+                            })?;
 
-                    quote! {
-                        #dest_f_name: #accessor.#source_f_name.map(|v| {
-                            #struct_mapping_inside_lambda
-                        }),
+                            quote! {
+                                #dest_f_name: #accessor.#source_f_name.map(|v| {
+                                    #struct_mapping_inside_lambda
+                                }),
+                            }
+                        }
+                        (
+                            rodc_util::TOfOption::Primitive(_source_p_ty),
+                            rodc_util::TOfOption::Primitive(_dest_p_ty),
+                        ) => unimplemented!("primitive type inside Option<T>"),
+                        _ => {
+                            anyhow::bail!("Source and destination Option<T> must be of same kind (eg. Path or primitive)")
+                        }
                     }
                 }
                 // TODO: Result<T, E> mapping
