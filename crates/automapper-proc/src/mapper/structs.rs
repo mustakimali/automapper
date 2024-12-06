@@ -1,6 +1,8 @@
 use anyhow::Context;
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use rustdoc_types::{GenericArg, GenericArgs};
+use syn::Ident;
 
 use crate::{
     models::context::MacroCtx,
@@ -71,20 +73,12 @@ impl TypeToTypeMapping {
                 // TODO: implement
                 quote! {}
             }
-            rodc_util::StructFieldKind::Primitive { name: _ } => {
-                if dest_field.kind.is_primitive_eq(&source_field.kind) {
-                    // primitive types: can be directly assigned
-                    quote! {
-                        #dest_f_name: #accessor_with_field, /* primative type */
-                    }
-                } else {
-                    // primitive types: may require explicit casting
-                    //TODO(FIX): only castable types
-                    quote! {
-                        #dest_f_name: #accessor_with_field as _, /* primative type with casting */
-                    }
-                }
-            }
+            rodc_util::StructFieldKind::Primitive { name: _ } => primitive_mapping(
+                accessor_with_field,
+                dest_f_name,
+                &source_field.kind,
+                &dest_field.kind,
+            ),
             rodc_util::StructFieldKind::ResolvedPath { path: dest_path } => {
                 let rodc_util::StructFieldKind::ResolvedPath { path: source_path } =
                     &source_field.kind
@@ -100,9 +94,10 @@ impl TypeToTypeMapping {
                     let dest_t_of_option = dest_field.t_of_option()?;
 
                     match (source_t_of_option, dest_t_of_option) {
+                        // Option<T> where T is struct
                         (
-                            rodc_util::TOfOption::ResolvedPath(source),
-                            rodc_util::TOfOption::ResolvedPath(dest),
+                            StructFieldKind::ResolvedPath { path: source },
+                            StructFieldKind::ResolvedPath { path: dest },
                         ) => {
                             let struct_mapping_inside_lambda = TypeToTypeMapping::new(
                                 rodc_util::find_path_by_id(&source.id, &self.ctx.rdocs),
@@ -124,10 +119,16 @@ impl TypeToTypeMapping {
                                 }),
                             }
                         }
+                        // Option<T> where T is primitive (eg u32)
                         (
-                            rodc_util::TOfOption::Primitive(_source_p_ty),
-                            rodc_util::TOfOption::Primitive(_dest_p_ty),
-                        ) => unimplemented!("primitive type inside Option<T>"),
+                            source_kind @ StructFieldKind::Primitive { .. },
+                            dest_kind @ StructFieldKind::Primitive { .. },
+                        ) => primitive_mapping(
+                            accessor_with_field,
+                            dest_f_name,
+                            &source_kind,
+                            &dest_kind,
+                        ),
                         _ => {
                             anyhow::bail!("Source and destination Option<T> must be of same kind (eg. Path or primitive)")
                         }
@@ -184,5 +185,25 @@ impl TypeToTypeMapping {
         };
 
         Ok(token_stream)
+    }
+}
+
+fn primitive_mapping(
+    accessor_with_field: TokenStream,
+    dest_f_name: Ident,
+    source_kind: &StructFieldKind,
+    dest_kind: &StructFieldKind,
+) -> TokenStream {
+    if dest_kind.is_primitive_eq(source_kind) {
+        // primitive types: can be directly assigned
+        quote! {
+            #dest_f_name: #accessor_with_field, /* primative type */
+        }
+    } else {
+        // primitive types: may require explicit casting
+        //TODO(FIX): only castable types
+        quote! {
+            #dest_f_name: #accessor_with_field as _, /* primative type with casting */
+        }
     }
 }
