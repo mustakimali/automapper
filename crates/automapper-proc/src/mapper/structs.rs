@@ -141,6 +141,18 @@ impl TypeToTypeMapping {
                     &dest_field.kind,
                     &FieldKind::RESULT_TYPES,
                 ) {
+                    // E must be same (limitation)
+                    // ToDo: E mapping
+                    if !source_field
+                        .generic_arg_second()?
+                        .is_equal_type(&dest_field.generic_arg_second()?)
+                    {
+                        unimplemented!("Result<_, E> with different E type");
+                    }
+
+                    let source_t_of_result = source_field.generic_arg_first()?;
+                    let dest_t_of_result = dest_field.generic_arg_first()?;
+
                     todo!()
                 }
                 // TODO: Result<T, E> mapping

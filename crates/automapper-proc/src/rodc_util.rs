@@ -435,8 +435,13 @@ impl FieldKind {
     }
 
     pub fn is_primitive_eq(&self, other: &FieldKind) -> bool {
+        self.is_primitive() && self.is_equal_type(other)
+    }
+
+    pub fn is_equal_type(&self, other: &FieldKind) -> bool {
         match (self, other) {
             (FieldKind::Primitive { name: a }, FieldKind::Primitive { name: b }) => a == b,
+            (FieldKind::ResolvedPath { path: a }, FieldKind::ResolvedPath { path: b }) => a == b,
             _ => false,
         }
     }
