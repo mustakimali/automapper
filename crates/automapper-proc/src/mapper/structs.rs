@@ -153,7 +153,33 @@ impl TypeToTypeMapping {
                     let source_t_of_result = source_field.generic_arg_first()?;
                     let dest_t_of_result = dest_field.generic_arg_first()?;
 
-                    todo!()
+                    match (source_t_of_result, dest_t_of_result) {
+                        (FieldKind::Primitive { ..}, FieldKind::Primitive { .. }) => todo!(),
+
+                        (FieldKind::ResolvedPath { path: source_path }, FieldKind::ResolvedPath { path: dest_path }) => {
+                            let struct_mapping_inside_lambda = TypeToTypeMapping::new(
+                                rodc_util::find_path_by_id(&source_path.id, &self.ctx.rdocs),
+                                vec!["v".to_string()],
+                                rodc_util::find_path_by_id(&dest_path.id, &self.ctx.rdocs),
+                                self.ctx.clone(),
+                            ).with_context(|| {
+                                format!(
+                                    "failed to create mapping for source: {} and dest: {}",
+                                    source_path.name.clone(),
+                                    dest_path.name.clone()
+                                )
+                            })?;
+
+                            quote! {
+                                #dest_f_name: #accessor.#source_f_name.map(|v| {
+                                    #struct_mapping_inside_lambda
+                                }),
+                            }
+                        }
+
+                        (FieldKind::Tuple(_vec), FieldKind::Tuple(__vec)) => todo!(),
+                        _ => anyhow::bail!("Source and destination Result<T> must be of same kind (eg. Path, Primitive type etc)")
+                    }
                 }
                 // TODO: Result<T, E> mapping
 

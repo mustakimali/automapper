@@ -1,10 +1,11 @@
-use std::time::SystemTime;
-
 use automapper::{AutoMapsFrom, AutoMapsTo};
 
-use usage::models::{
-    DestEnumBasic, DestStruct, DestStructWithEnum, SourceEnumBasic, SourceStruct,
-    SourceStructWithEnum,
+use usage::{
+    gen::random_string,
+    models::{
+        DestEnumBasic, DestStruct, DestStructWithEnum, SourceEnumBasic, SourceStruct,
+        SourceStructWithEnum,
+    },
 };
 
 #[test]
@@ -83,8 +84,4 @@ fn enum_unit_variant() {
     let output = DestStructWithEnum::map_from(input.clone()); // Same thing that uses trait AutoMapsFrom (blanket impl)
 
     assert_eq!(output, expected_output);
-}
-
-fn random_string() -> String {
-    format!("{:?}", SystemTime::now())
 }
