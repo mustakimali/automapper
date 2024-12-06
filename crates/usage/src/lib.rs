@@ -24,7 +24,9 @@ automapper::map!(SourceStructWithEnum => DestStructWithEnum);
 //automapper::map!(models::SourceStructWithDifferentField > models::DestStructWithDifferentField);
 
 //
-// TODO: Proto enum mappings
+// Proto mappings
+// (Can't use automapper::map! due to orphan rule)
+//
 automapper::macros::impl_map_fn! {
     fn map_proto_struct(protogen::example::Person => protogen::example::HomoSepiens);
 }
