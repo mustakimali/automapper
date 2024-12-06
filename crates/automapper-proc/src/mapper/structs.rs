@@ -6,7 +6,7 @@ use syn::Ident;
 
 use crate::{
     models::context::MacroCtx,
-    rodc_util::{self, KindAsStr, RustType, StructFieldKind, StructRustType},
+    rodc_util::{self, FieldKind, KindAsStr, RustType, StructRustType},
     TypeToTypeMapping,
 };
 
@@ -69,19 +69,18 @@ impl TypeToTypeMapping {
         };
 
         let token_stream = match &dest_field.kind {
-            rodc_util::StructFieldKind::Tuple(_touple_items) => {
+            rodc_util::FieldKind::Tuple(_touple_items) => {
                 // TODO: implement
                 quote! {}
             }
-            rodc_util::StructFieldKind::Primitive { name: _ } => primitive_mapping(
+            rodc_util::FieldKind::Primitive { name: _ } => primitive_mapping(
                 accessor_with_field,
                 dest_f_name,
                 &source_field.kind,
                 &dest_field.kind,
             ),
-            rodc_util::StructFieldKind::ResolvedPath { path: dest_path } => {
-                let rodc_util::StructFieldKind::ResolvedPath { path: source_path } =
-                    &source_field.kind
+            rodc_util::FieldKind::ResolvedPath { path: dest_path } => {
+                let rodc_util::FieldKind::ResolvedPath { path: source_path } = &source_field.kind
                 else {
                     unreachable!("must be resolved path")
                 };
@@ -89,15 +88,19 @@ impl TypeToTypeMapping {
                 // Possiblity: Option<T>
                 //
                 //
-                if StructFieldKind::are_both_option_type(&source_field.kind, &dest_field.kind) {
+                if FieldKind::are_both_same_type_of(
+                    &source_field.kind,
+                    &dest_field.kind,
+                    &FieldKind::OPTION_TYPES,
+                ) {
                     let source_t_of_option = source_field.generic_arg_first()?;
                     let dest_t_of_option = dest_field.generic_arg_first()?;
 
                     match (source_t_of_option, dest_t_of_option) {
                         // Option<T> where T is struct
                         (
-                            StructFieldKind::ResolvedPath { path: source },
-                            StructFieldKind::ResolvedPath { path: dest },
+                            FieldKind::ResolvedPath { path: source },
+                            FieldKind::ResolvedPath { path: dest },
                         ) => {
                             let struct_mapping_inside_lambda = TypeToTypeMapping::new(
                                 rodc_util::find_path_by_id(&source.id, &self.ctx.rdocs),
@@ -121,8 +124,8 @@ impl TypeToTypeMapping {
                         }
                         // Option<T> where T is primitive (eg u32)
                         (
-                            source_kind @ StructFieldKind::Primitive { .. },
-                            dest_kind @ StructFieldKind::Primitive { .. },
+                            source_kind @ FieldKind::Primitive { .. },
+                            dest_kind @ FieldKind::Primitive { .. },
                         ) => primitive_mapping(
                             accessor_with_field,
                             dest_f_name,
@@ -133,6 +136,12 @@ impl TypeToTypeMapping {
                             anyhow::bail!("Source and destination Option<T> must be of same kind (eg. Path or primitive)")
                         }
                     }
+                } else if FieldKind::are_both_same_type_of(
+                    &source_field.kind,
+                    &dest_field.kind,
+                    &FieldKind::RESULT_TYPES,
+                ) {
+                    todo!()
                 }
                 // TODO: Result<T, E> mapping
 
@@ -191,8 +200,8 @@ impl TypeToTypeMapping {
 fn primitive_mapping(
     accessor_with_field: TokenStream,
     dest_f_name: Ident,
-    source_kind: &StructFieldKind,
-    dest_kind: &StructFieldKind,
+    source_kind: &FieldKind,
+    dest_kind: &FieldKind,
 ) -> TokenStream {
     if dest_kind.is_primitive_eq(source_kind) {
         // primitive types: can be directly assigned

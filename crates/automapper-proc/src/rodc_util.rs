@@ -179,14 +179,14 @@ fn _find_struct_with_resolved_fields(
 }
 
 fn _resolve_fields(rdocs: &Crate, fields: &[rustdoc_types::Id]) -> Vec<StructFieldOrEnumVariant> {
-    fn map_field_kind(ty: &rustdoc_types::Type) -> StructFieldKind {
+    fn map_field_kind(ty: &rustdoc_types::Type) -> FieldKind {
         match ty {
             rustdoc_types::Type::ResolvedPath(path) => {
-                StructFieldKind::ResolvedPath { path: path.clone() }
+                FieldKind::ResolvedPath { path: path.clone() }
             }
-            rustdoc_types::Type::Primitive(ty) => StructFieldKind::Primitive { name: ty.clone() },
+            rustdoc_types::Type::Primitive(ty) => FieldKind::Primitive { name: ty.clone() },
             rustdoc_types::Type::Tuple(ty) => {
-                StructFieldKind::Tuple(ty.iter().map(map_field_kind).collect::<Vec<_>>())
+                FieldKind::Tuple(ty.iter().map(map_field_kind).collect::<Vec<_>>())
             }
             _ => {
                 dbg!(ty);
@@ -329,26 +329,26 @@ pub enum StructKind {
 pub struct StructFieldOrEnumVariant {
     /// Unset for tuple fields
     pub name: Option<String>,
-    pub kind: StructFieldKind,
+    pub kind: FieldKind,
 }
 
 #[derive(Debug, Clone)]
-pub enum StructFieldKind {
+pub enum FieldKind {
     Primitive { name: String },
     ResolvedPath { path: rustdoc_types::Path },
-    Tuple(Vec<StructFieldKind>),
+    Tuple(Vec<FieldKind>),
 }
 
 impl StructFieldOrEnumVariant {
-    pub fn generic_arg_first(&self) -> anyhow::Result<StructFieldKind> {
+    pub fn generic_arg_first(&self) -> anyhow::Result<FieldKind> {
         self.generic_arg_nth(0)
     }
 
-    pub fn generic_arg_second(&self) -> anyhow::Result<StructFieldKind> {
+    pub fn generic_arg_second(&self) -> anyhow::Result<FieldKind> {
         self.generic_arg_nth(1)
     }
 
-    fn generic_arg_nth(&self, skip: u8) -> anyhow::Result<StructFieldKind> {
+    fn generic_arg_nth(&self, skip: u8) -> anyhow::Result<FieldKind> {
         let args = self.generic_args()?;
 
         let Some(GenericArg::Type(ty)) = args.iter().skip(skip as _).next() else {
@@ -359,9 +359,9 @@ impl StructFieldOrEnumVariant {
 
         let result = match ty {
             rustdoc_types::Type::ResolvedPath(path) => {
-                StructFieldKind::ResolvedPath { path: path.clone() }
+                FieldKind::ResolvedPath { path: path.clone() }
             }
-            rustdoc_types::Type::Primitive(p) => StructFieldKind::Primitive { name: p.clone() },
+            rustdoc_types::Type::Primitive(p) => FieldKind::Primitive { name: p.clone() },
             _ => {
                 dbg!(ty);
                 anyhow::bail!("unimplemented: Option type with unsupported variant")
@@ -372,7 +372,7 @@ impl StructFieldOrEnumVariant {
     }
 
     fn generic_args(&self) -> anyhow::Result<&Vec<GenericArg>> {
-        let StructFieldKind::ResolvedPath { path: source_path } = &self.kind else {
+        let FieldKind::ResolvedPath { path: source_path } = &self.kind else {
             anyhow::bail!("must be a resolved path")
         };
 
@@ -392,65 +392,51 @@ impl StructFieldOrEnumVariant {
     }
 }
 
-impl StructFieldKind {
+impl FieldKind {
+    pub const OPTION_TYPES: [&'static str; 2] = ["Option", "::core::option::Option"];
+    pub const RESULT_TYPES: [&'static str; 2] = ["Result", "::core::result::Result"];
+
     pub fn as_str(&self) -> Cow<str> {
         match self {
-            StructFieldKind::Primitive { name } => Cow::Borrowed(name),
-            StructFieldKind::ResolvedPath { path } => Cow::Borrowed(&path.name),
-            StructFieldKind::Tuple(vec) => Cow::Owned(format!(
+            FieldKind::Primitive { name } => Cow::Borrowed(name),
+            FieldKind::ResolvedPath { path } => Cow::Borrowed(&path.name),
+            FieldKind::Tuple(vec) => Cow::Owned(format!(
                 "({})",
                 vec.iter().map(|t| t.as_str()).collect::<Vec<_>>().join(",")
             )),
         }
     }
-    pub fn is_same_kind(&self, other: &StructFieldKind) -> bool {
+    pub fn is_same_kind(&self, other: &FieldKind) -> bool {
         matches!(
             (self, other),
-            (
-                StructFieldKind::Primitive { .. },
-                StructFieldKind::Primitive { .. }
-            ) | (
-                StructFieldKind::ResolvedPath { .. },
-                StructFieldKind::ResolvedPath { .. }
-            )
+            (FieldKind::Primitive { .. }, FieldKind::Primitive { .. })
+                | (
+                    FieldKind::ResolvedPath { .. },
+                    FieldKind::ResolvedPath { .. }
+                )
         )
     }
 
-    pub fn are_both_option_type(item1: &StructFieldKind, item2: &StructFieldKind) -> bool {
-        const OPTIONS: [&str; 2] = ["Option", "::core::option::Option"];
+    pub fn are_both_same_type_of(item1: &FieldKind, item2: &FieldKind, types: &[&str]) -> bool {
         match (item1, item2) {
-            (
-                StructFieldKind::ResolvedPath { path: p1 },
-                StructFieldKind::ResolvedPath { path: p2 },
-            ) => OPTIONS.contains(&p1.name.as_str()) && OPTIONS.contains(&p2.name.as_str()),
-            _ => false,
-        }
-    }
-
-    pub fn are_both_result_type(item1: &StructFieldKind, item2: &StructFieldKind) -> bool {
-        const OPTIONS: [&str; 2] = ["Option", "::core::option::Option"];
-        match (item1, item2) {
-            (
-                StructFieldKind::ResolvedPath { path: p1 },
-                StructFieldKind::ResolvedPath { path: p2 },
-            ) => OPTIONS.contains(&p1.name.as_str()) && OPTIONS.contains(&p2.name.as_str()),
+            (FieldKind::ResolvedPath { path: p1 }, FieldKind::ResolvedPath { path: p2 }) => {
+                types.contains(&p1.name.as_str()) && types.contains(&p2.name.as_str())
+            }
             _ => false,
         }
     }
 
     pub fn is_primitive(&self) -> bool {
-        matches!(self, StructFieldKind::Primitive { .. })
+        matches!(self, FieldKind::Primitive { .. })
     }
 
     pub fn is_resolved_path(&self) -> bool {
-        matches!(self, StructFieldKind::ResolvedPath { .. })
+        matches!(self, FieldKind::ResolvedPath { .. })
     }
 
-    pub fn is_primitive_eq(&self, other: &StructFieldKind) -> bool {
+    pub fn is_primitive_eq(&self, other: &FieldKind) -> bool {
         match (self, other) {
-            (StructFieldKind::Primitive { name: a }, StructFieldKind::Primitive { name: b }) => {
-                a == b
-            }
+            (FieldKind::Primitive { name: a }, FieldKind::Primitive { name: b }) => a == b,
             _ => false,
         }
     }

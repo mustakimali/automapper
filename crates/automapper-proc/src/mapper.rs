@@ -4,7 +4,7 @@ use rustdoc_types::{GenericArg, GenericArgs};
 
 use crate::{
     models::context::MacroCtx,
-    rodc_util::{self, KindAsStr, RustType, StructFieldKind, StructRustType},
+    rodc_util::{self, FieldKind, KindAsStr, RustType, StructRustType},
 };
 
 mod enums;
