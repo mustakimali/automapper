@@ -1,4 +1,7 @@
-use models::{DestStruct4, DestStructWithEnum, SourceStruct3, SourceStructWithEnum};
+use models::{
+    DestStruct4, DestStructWithEnum, DestStructWithResult, SourceStruct3, SourceStructWithEnum,
+    SourceStructWithResult,
+};
 
 pub mod models;
 #[allow(unused, clippy::redundant_field_names)]
@@ -15,7 +18,8 @@ automapper::map!(models::SourceStruct2 => models::DestStruct2);
 automapper::map!(SourceStruct3 => DestStruct4);
 // Option<T> where T is primitive
 automapper::map!(models::SourcePrim => models::DestPrim);
-
+// Result<T>
+//automapper::map!(models::SourceStructWithResult => models::DestStructWithResult);
 //
 // Enum mappings
 automapper::map!(SourceStructWithEnum => DestStructWithEnum);

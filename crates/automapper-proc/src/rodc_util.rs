@@ -340,25 +340,19 @@ pub enum StructFieldKind {
 }
 
 impl StructFieldOrEnumVariant {
-    pub fn t_of_option(&self) -> anyhow::Result<StructFieldKind> {
-        let StructFieldKind::ResolvedPath { path: source_path } = &self.kind else {
-            anyhow::bail!("must be a resolved path")
-        };
+    pub fn generic_arg_first(&self) -> anyhow::Result<StructFieldKind> {
+        self.generic_arg_nth(0)
+    }
 
-        let Some(generic_args) = &source_path.args else {
-            anyhow::bail!("unreachable(BUG): must have args");
-        };
-        let GenericArgs::AngleBracketed {
-            args,
-            constraints: _,
-        } = generic_args.as_ref()
-        else {
-            dbg!(generic_args);
+    pub fn generic_arg_second(&self) -> anyhow::Result<StructFieldKind> {
+        self.generic_arg_nth(1)
+    }
 
-            anyhow::bail!("unimplemented: Option type of parentized argument")
-        };
-        let Some(GenericArg::Type(ty)) = args.iter().next() else {
-            dbg!(generic_args);
+    fn generic_arg_nth(&self, skip: u8) -> anyhow::Result<StructFieldKind> {
+        let args = self.generic_args()?;
+
+        let Some(GenericArg::Type(ty)) = args.iter().skip(skip as _).next() else {
+            dbg!(args);
 
             anyhow::bail!("unimplemented: Option type with infered, const or lifetype argument")
         };
@@ -375,6 +369,26 @@ impl StructFieldOrEnumVariant {
         };
 
         Ok(result)
+    }
+
+    fn generic_args(&self) -> anyhow::Result<&Vec<GenericArg>> {
+        let StructFieldKind::ResolvedPath { path: source_path } = &self.kind else {
+            anyhow::bail!("must be a resolved path")
+        };
+
+        let Some(generic_args) = &source_path.args else {
+            anyhow::bail!("unreachable(BUG): must have args");
+        };
+        let GenericArgs::AngleBracketed {
+            args,
+            constraints: _,
+        } = generic_args.as_ref()
+        else {
+            dbg!(generic_args);
+
+            anyhow::bail!("unimplemented: Option type of parentized argument")
+        };
+        Ok(args)
     }
 }
 
@@ -403,6 +417,17 @@ impl StructFieldKind {
     }
 
     pub fn are_both_option_type(item1: &StructFieldKind, item2: &StructFieldKind) -> bool {
+        const OPTIONS: [&str; 2] = ["Option", "::core::option::Option"];
+        match (item1, item2) {
+            (
+                StructFieldKind::ResolvedPath { path: p1 },
+                StructFieldKind::ResolvedPath { path: p2 },
+            ) => OPTIONS.contains(&p1.name.as_str()) && OPTIONS.contains(&p2.name.as_str()),
+            _ => false,
+        }
+    }
+
+    pub fn are_both_result_type(item1: &StructFieldKind, item2: &StructFieldKind) -> bool {
         const OPTIONS: [&str; 2] = ["Option", "::core::option::Option"];
         match (item1, item2) {
             (

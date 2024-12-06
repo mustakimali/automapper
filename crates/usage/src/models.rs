@@ -109,3 +109,13 @@ pub struct DestStructWithDifferentField {
     pub b: i32,
     pub c: i32, // this needs to be mapped manually
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceStructWithResult {
+    pub field: Result<SourceStruct2, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DestStructWithResult {
+    pub field: Result<DestStruct2, String>,
+}

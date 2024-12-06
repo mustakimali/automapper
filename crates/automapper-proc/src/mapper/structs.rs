@@ -90,8 +90,8 @@ impl TypeToTypeMapping {
                 //
                 //
                 if StructFieldKind::are_both_option_type(&source_field.kind, &dest_field.kind) {
-                    let source_t_of_option = source_field.t_of_option()?;
-                    let dest_t_of_option = dest_field.t_of_option()?;
+                    let source_t_of_option = source_field.generic_arg_first()?;
+                    let dest_t_of_option = dest_field.generic_arg_first()?;
 
                     match (source_t_of_option, dest_t_of_option) {
                         // Option<T> where T is struct
