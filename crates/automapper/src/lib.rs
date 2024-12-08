@@ -32,7 +32,7 @@ macro_rules! map {
         impl ::automapper::AutoMapsTo<$d> for $s {
             fn map_to(self) -> $d {
                 ::automapper::macros::impl_map_fn! {
-                    fn __map($s => $d);
+                    fn __map($s) -> $d;
                 }
 
                 __map(self)

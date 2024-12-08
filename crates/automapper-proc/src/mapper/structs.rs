@@ -44,7 +44,6 @@ impl TypeToTypeMapping {
         dest_field: &rodc_util::StructFieldOrEnumVariant,
         accessor: Option<&proc_macro2::TokenStream>,
     ) -> anyhow::Result<proc_macro2::TokenStream> {
-        // ^ TODO: remove Option
         let Some(source_field) = source_fields.iter().find(|f| f.name == dest_field.name) else {
             panic!(
                 "failed to find matching source field for dest field: {}",

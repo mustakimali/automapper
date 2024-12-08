@@ -28,7 +28,10 @@ struct TraitImpl {
     struct_token: Token![fn],
     iden: syn::Ident,
     paren_token: token::Paren,
-    mapping: Request,
+    //mapping: Request,
+    source_type: syn::Path,
+    arrow_token: Token![->],
+    dest_type: syn::Path,
     semi_token: Token![;],
 }
 
@@ -53,7 +56,10 @@ impl Parse for TraitImpl {
             struct_token: input.parse()?,
             iden: input.parse()?,
             paren_token: parenthesized!(content in input),
-            mapping: content.parse()?,
+            //mapping: content.parse()?,
+            source_type: content.parse()?,
+            arrow_token: input.parse()?,
+            dest_type: input.parse()?,
             semi_token: input.parse()?,
         };
 
@@ -97,9 +103,9 @@ impl ToTokens for TraitImpl {
         let ctx = MacroCtx::new(rdocs);
 
         let mapping = TypeToTypeMapping::new(
-            self.mapping.source_type.clone(),
+            self.source_type.clone(),
             vec!["value".to_string()], // the name of the input variable in the mapping function
-            self.mapping.dest_type.clone(),
+            self.dest_type.clone(),
             ctx,
         )
         .expect("create struct to struct mapping");
