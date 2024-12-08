@@ -32,14 +32,8 @@ struct TraitImpl {
     source_type: syn::Path,
     arrow_token: Token![->],
     dest_type: syn::Path,
-    semi_token: Token![;],
-}
-
-#[derive(Debug, Clone)]
-struct Request {
-    source_type: syn::Path,
-    _coma: syn::Token![=>],
-    dest_type: syn::Path,
+    expr_token: Option<syn::Expr>,
+    semi_token: Option<Token![;]>,
 }
 
 /// See crate level doc for automapper for more information.
@@ -56,24 +50,14 @@ impl Parse for TraitImpl {
             struct_token: input.parse()?,
             iden: input.parse()?,
             paren_token: parenthesized!(content in input),
-            //mapping: content.parse()?,
             source_type: content.parse()?,
             arrow_token: input.parse()?,
             dest_type: input.parse()?,
+            expr_token: input.parse().ok(),
             semi_token: input.parse()?,
         };
 
         Ok(this)
-    }
-}
-
-impl Parse for Request {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        Ok(Self {
-            source_type: input.parse()?,
-            _coma: input.parse()?,
-            dest_type: input.parse()?,
-        })
     }
 }
 
