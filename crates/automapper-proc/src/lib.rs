@@ -32,8 +32,25 @@ struct TraitImpl {
     source_type: syn::Path,
     arrow_token: Token![->],
     dest_type: syn::Path,
-    expr_token: Option<syn::Expr>,
+    mapping: Option<Vec<Mapping>>,
     semi_token: Option<Token![;]>,
+}
+
+#[derive(Debug)]
+struct Mapping {
+    field: syn::Ident,
+    value: syn::Expr,
+}
+impl Parse for Mapping {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        Ok(Self {
+            field: input.parse()?,
+            value: {
+                let _: Token![:] = input.parse()?;
+                input.parse()?
+            },
+        })
+    }
 }
 
 /// See crate level doc for automapper for more information.
@@ -45,6 +62,17 @@ pub fn impl_map_fn(input: TokenStream) -> TokenStream {
 
 impl Parse for TraitImpl {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        fn parse_mappings(input: &syn::parse::ParseStream) -> syn::Result<Vec<Mapping>> {
+            let content;
+            let _paren = parenthesized!(content in input);
+            let mappings = content
+                .parse_terminated(Mapping::parse, Token![,])?
+                .into_iter()
+                .collect::<Vec<_>>();
+
+            Ok(mappings)
+        }
+
         let content;
         let this = Self {
             struct_token: input.parse()?,
@@ -53,9 +81,23 @@ impl Parse for TraitImpl {
             source_type: content.parse()?,
             arrow_token: input.parse()?,
             dest_type: input.parse()?,
-            expr_token: input.parse().ok(),
-            semi_token: input.parse()?,
+            mapping: parse_mappings(&input).ok(),
+            semi_token: input.parse().ok(),
         };
+
+        if let Some(mapping) = this.mapping.as_ref() {
+            dbg!(mapping);
+        }
+
+        match (this.semi_token.is_some(), this.mapping.is_some()) {
+            (true, true) => {
+                return Err(
+                    input.error("no `;` is needed when a mapping is provided. Remove the `;`")
+                )
+            }
+            (false, false) => return Err(input.error("expected expression or a `;`")),
+            _ => {}
+        }
 
         Ok(this)
     }
@@ -64,7 +106,10 @@ impl Parse for TraitImpl {
 impl ToTokens for TraitImpl {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let cargo_toml_path = caller_crate_cargo_toml();
-        let rustdoc_path = cargo_toml_path.parent().unwrap().join("rustdoc.json");
+        let rustdoc_path = cargo_toml_path
+            .parent()
+            .expect("cargo.toml path")
+            .join("rustdoc.json");
 
         if !rustdoc_path.exists() {
             eprintln!(
