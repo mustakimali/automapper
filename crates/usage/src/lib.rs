@@ -27,10 +27,8 @@ automapper::map!(SourceStructWithEnum => DestStructWithEnum);
 //automapper::map!(models::SourceStructWithDifferentField) -> models::DestStructWithDifferentField;
 automapper::macros::impl_map_fn! {
     fn map_with_missing_field(models::SourceStructWithDifferentField) -> models::DestStructWithDifferentField (
-        a : a,
-        b : b,
-        s : s,
-        missing_field : "default value",
+        c: value.z, // c was missing in source, so map z to c
+        DestStructWithDifferentField.c: value.z, // same this but with field prefix to disambiguate (this is looked first)
     )
 }
 

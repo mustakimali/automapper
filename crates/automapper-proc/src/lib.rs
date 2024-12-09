@@ -36,15 +36,15 @@ struct TraitImpl {
     semi_token: Option<Token![;]>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Mapping {
-    field: syn::Ident,
+    field: String,
     value: syn::Expr,
 }
 impl Parse for Mapping {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         Ok(Self {
-            field: input.parse()?,
+            field: input.parse::<syn::Expr>()?.to_token_stream().to_string(),
             value: {
                 let _: Token![:] = input.parse()?;
                 input.parse()?
@@ -84,10 +84,6 @@ impl Parse for TraitImpl {
             mapping: parse_mappings(&input).ok(),
             semi_token: input.parse().ok(),
         };
-
-        if let Some(mapping) = this.mapping.as_ref() {
-            dbg!(mapping);
-        }
 
         match (this.semi_token.is_some(), this.mapping.is_some()) {
             (true, true) => {
@@ -129,7 +125,7 @@ impl ToTokens for TraitImpl {
                 .expect("parse rustdoc.json as json")
         };
 
-        let ctx = MacroCtx::new(rdocs);
+        let ctx = MacroCtx::new(rdocs, self.mapping.clone());
 
         let mapping = TypeToTypeMapping::new(
             self.source_type.clone(),
