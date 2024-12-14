@@ -44,13 +44,56 @@ impl TypeToTypeMapping {
         dest_field: &rodc_util::StructFieldOrEnumVariant,
         accessor: Option<&proc_macro2::TokenStream>,
     ) -> anyhow::Result<proc_macro2::TokenStream> {
+        let dest_f_name = format_ident!("{}", dest_field.name.clone().unwrap_or_default());
+        let (mapping_key_prefixed, mapping_key) = {
+            let dest_ty_name_str = format!("{}.", self.dest.name());
+            let key = match accessor {
+                Some(accessor) => quote! {
+                    #accessor.#dest_f_name
+                },
+                None => quote! {  #dest_f_name },
+            }
+            .to_string();
+            let key = key
+                .strip_prefix("v.")
+                .unwrap_or(&key)
+                .strip_prefix("value.")
+                .unwrap_or(&key)
+                .to_string();
+
+            (format!("{}{}", dest_ty_name_str, key), key)
+        };
+
+        if let Some(custom_mapping) = self
+            .ctx
+            .custom_mappings
+            .as_ref()
+            .map(|mappings| {
+                mappings
+                    .iter()
+                    .find(|m| m.field == mapping_key_prefixed)
+                    .or_else(|| mappings.iter().find(|m| m.field == mapping_key))
+                    .map(|m| {
+                        let value = &m.value;
+                        quote! {
+                            #dest_f_name: #value,
+                        }
+                    })
+            })
+            .flatten()
+        {
+            return Ok(custom_mapping);
+        }
+
         let Some(source_field) = source_fields.iter().find(|f| f.name == dest_field.name) else {
             panic!(
-                "failed to find matching source field for dest field: {}",
-                dest_field.name.clone().unwrap_or_default() // must be Some(_) for Plain struct fields
+                "failed to find matching source field for dest field: {},\nTip: you can define an override mapping for this field using `{}: ...` or `{}: ...`",
+                dest_field.name.clone().unwrap_or_default(), // must be Some(_) for Plain struct fields
+                mapping_key,
+                mapping_key_prefixed
             );
         };
-        let dest_f_name = format_ident!("{}", dest_field.name.clone().unwrap_or_default());
+
         let source_f_name = format_ident!("{}", source_field.name.clone().unwrap_or_default());
         if !dest_field.kind.is_same_kind(&source_field.kind) {
             panic!(
@@ -59,7 +102,6 @@ impl TypeToTypeMapping {
                 source_field.kind.as_str()
             );
         }
-
         let accessor_with_field = match accessor {
             Some(accessor) => quote! {
                 #accessor.#source_f_name

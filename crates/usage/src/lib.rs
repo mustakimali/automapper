@@ -24,7 +24,13 @@ automapper::map!(SourceStructWithEnum => DestStructWithEnum);
 
 //
 // TODO:Custom mapping
-//automapper::map!(models::SourceStructWithDifferentField => models::DestStructWithDifferentField);
+//automapper::map!(models::SourceStructWithDifferentField) -> models::DestStructWithDifferentField;
+automapper::macros::impl_map_fn! {
+    fn map_with_missing_field(models::SourceStructWithDifferentField) -> models::DestStructWithDifferentField (
+        c: value.z, // c was missing in source, so map z to c
+        DestStructWithDifferentField.c: value.z, // same this but with field prefix to disambiguate (this is looked first)
+    )
+}
 
 //
 // Proto mappings
